@@ -31,21 +31,88 @@ export class PipedriveError extends Error {
   }
 }
 
-export function getPipedriveConfig(): PipedriveConfig | null {
-  const token = process.env.PIPEDRIVE_API_TOKEN?.trim();
-  const domain = process.env.PIPEDRIVE_COMPANY_DOMAIN?.trim();
-  if (!token || !domain) return null;
-  // aceita tanto "sobe" quanto "sobe.pipedrive.com" ou a URL completa
-  const clean = domain
+/** Normaliza "sobe", "sobe.pipedrive.com" ou a URL completa para "sobe". */
+function cleanDomain(raw?: string | null): string {
+  return (raw ?? "")
+    .trim()
     .replace(/^https?:\/\//, "")
     .replace(/\.pipedrive\.com.*$/, "")
     .replace(/\/.*$/, "");
-  if (!clean) return null;
-  return { token, domain: clean };
+}
+
+export function getPipedriveConfig(): PipedriveConfig | null {
+  const token = process.env.PIPEDRIVE_API_TOKEN?.trim();
+  if (!token) return null;
+  // o domínio é opcional: se não vier, descobrimos a partir do token
+  return { token, domain: cleanDomain(process.env.PIPEDRIVE_COMPANY_DOMAIN) };
 }
 
 export function isPipedriveConfigured(): boolean {
   return getPipedriveConfig() !== null;
+}
+
+/**
+ * Descobre o domínio da empresa a partir do próprio token.
+ *
+ * `api.pipedrive.com/v1/users/me` responde sem exigir o domínio e devolve
+ * `company_domain` — então a configuração não depende de acertar esse valor
+ * na mão, e um domínio errado no ambiente deixa de quebrar a integração.
+ */
+const domainCache = new Map<string, string>();
+
+export async function resolveCompanyDomain(token: string): Promise<string> {
+  const cached = domainCache.get(token);
+  if (cached) return cached;
+
+  const override = process.env.PIPEDRIVE_API_BASE_URL?.trim();
+  const url = override
+    ? `${override.replace(/\/$/, "")}/api/v1/users/me`
+    : "https://api.pipedrive.com/v1/users/me";
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "x-api-token": token, Accept: "application/json" },
+      cache: "no-store",
+    });
+  } catch {
+    throw new PipedriveError("Não foi possível conectar ao Pipedrive.");
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    throw new PipedriveError(
+      "Token do Pipedrive inválido ou sem permissão. Confira PIPEDRIVE_API_TOKEN.",
+      res.status
+    );
+  }
+
+  const body = await readJson<{ data?: { company_domain?: string } }>(res);
+  const domain = cleanDomain(body?.data?.company_domain);
+  if (!domain) {
+    throw new PipedriveError(
+      "O Pipedrive não informou o domínio da empresa para este token."
+    );
+  }
+
+  domainCache.set(token, domain);
+  return domain;
+}
+
+/**
+ * Lê o corpo como JSON. Um domínio errado devolve a página HTML do Pipedrive
+ * com status 200 — sem este tratamento, o HTML inteiro viraria a mensagem
+ * de erro.
+ */
+async function readJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new PipedriveError(
+      "O Pipedrive respondeu com uma página em vez de dados — normalmente isso significa domínio da empresa incorreto.",
+      res.status
+    );
+  }
 }
 
 /**
@@ -70,7 +137,33 @@ async function request<T>(
   path: string,
   params: Record<string, string | number | undefined> = {}
 ): Promise<PipedriveResponse<T>> {
-  const url = new URL(`${baseUrl(config, API_VERSION)}/${path}`);
+  // o domínio vem do token quando não foi configurado à mão
+  const domain = config.domain || (await resolveCompanyDomain(config.token));
+  try {
+    return await requestWithDomain<T>(config, domain, path, params);
+  } catch (e) {
+    // Um domínio configurado errado devolve HTML ou 404. Nesse caso
+    // descobrimos o correto pelo token e refazemos a chamada, para que um
+    // valor errado no ambiente não derrube a integração.
+    const recoverable =
+      e instanceof PipedriveError &&
+      config.domain &&
+      (e.status === 404 || e.message.includes("página em vez de dados"));
+    if (!recoverable) throw e;
+
+    const discovered = await resolveCompanyDomain(config.token);
+    if (discovered === domain) throw e;
+    return await requestWithDomain<T>(config, discovered, path, params);
+  }
+}
+
+async function requestWithDomain<T>(
+  config: PipedriveConfig,
+  domain: string,
+  path: string,
+  params: Record<string, string | number | undefined>
+): Promise<PipedriveResponse<T>> {
+  const url = new URL(`${baseUrl({ ...config, domain }, API_VERSION)}/${path}`);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") {
       url.searchParams.set(key, String(value));
@@ -116,7 +209,7 @@ async function request<T>(
     let detail = "";
     try {
       const body = (await res.json()) as { error?: string };
-      detail = body?.error ? ` — ${body.error}` : "";
+      detail = body?.error ? ` — ${String(body.error).slice(0, 200)}` : "";
     } catch {
       /* corpo não-JSON */
     }
@@ -126,7 +219,7 @@ async function request<T>(
     );
   }
 
-  return (await res.json()) as PipedriveResponse<T>;
+  return await readJson<PipedriveResponse<T>>(res);
 }
 
 /** Busca todas as páginas de um endpoint de coleção (paginação por cursor). */
@@ -247,9 +340,9 @@ export const pipedrive = {
    * este recurso. Se falhar, seguimos sem os nomes dos responsáveis.
    */
   users: async (c: PipedriveConfig): Promise<PdUser[]> => {
-    const url = `${baseUrl(c, "v1")}/users`;
     try {
-      const res = await fetch(url, {
+      const domain = c.domain || (await resolveCompanyDomain(c.token));
+      const res = await fetch(`${baseUrl({ ...c, domain }, "v1")}/users`, {
         headers: { "x-api-token": c.token, Accept: "application/json" },
         cache: "no-store",
       });
