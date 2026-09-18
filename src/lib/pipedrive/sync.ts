@@ -129,6 +129,7 @@ export async function syncPipedrive(): Promise<SyncResult> {
         stageOrder: stage?.order_nr ?? null,
         status: d.status ?? "open",
         expectedCloseDate: d.expected_close_date ?? null,
+        wonTime: toDate(d.won_time ?? d.close_time),
         lastActivityAt: lastAct ? activityDueAt(lastAct) : null,
         nextActivityAt: nextAct ? activityDueAt(nextAct) : null,
         nextActivitySubject: nextAct?.subject ?? null,
@@ -164,6 +165,9 @@ export async function syncPipedrive(): Promise<SyncResult> {
               stageOrder: sql`excluded.stage_order`,
               status: sql`excluded.status`,
               expectedCloseDate: sql`excluded.expected_close_date`,
+              wonTime: sql`excluded.won_time`,
+              // is_recurring / monthly_value ficam de fora de propósito:
+              // são anotações locais e precisam sobreviver à sincronização
               lastActivityAt: sql`excluded.last_activity_at`,
               nextActivityAt: sql`excluded.next_activity_at`,
               nextActivitySubject: sql`excluded.next_activity_subject`,

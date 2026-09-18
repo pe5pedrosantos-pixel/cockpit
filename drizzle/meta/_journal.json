@@ -15,6 +15,13 @@
       "when": 1789766526620,
       "tag": "0001_pipedrive_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789773773534,
+      "tag": "0002_deal_revenue",
+      "breakpoints": true
     }
   ]
 }

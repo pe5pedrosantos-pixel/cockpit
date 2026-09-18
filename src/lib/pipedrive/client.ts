@@ -278,6 +278,8 @@ export interface PdDeal {
   stage_id?: number | null;
   status?: string | null;
   expected_close_date?: string | null;
+  won_time?: string | null;
+  close_time?: string | null;
   add_time?: string | null;
   update_time?: string | null;
   next_activity_id?: number | null;
@@ -313,6 +315,90 @@ export interface PdActivity {
   is_deleted?: boolean;
 }
 
+/** POST em um endpoint da v2. Usado para criar registros no Pipedrive. */
+async function post<T>(
+  config: PipedriveConfig,
+  path: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  const domain = config.domain || (await resolveCompanyDomain(config.token));
+  const url = `${baseUrl({ ...config, domain }, API_VERSION)}/${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "x-api-token": config.token,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch {
+    throw new PipedriveError("Não foi possível conectar ao Pipedrive.");
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    throw new PipedriveError(
+      "O token do Pipedrive não tem permissão para criar registros.",
+      res.status
+    );
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const b = (await res.json()) as { error?: string };
+      detail = b?.error ? ` — ${String(b.error).slice(0, 200)}` : "";
+    } catch {
+      /* corpo não-JSON */
+    }
+    throw new PipedriveError(
+      `O Pipedrive recusou a criação (${res.status})${detail}`,
+      res.status
+    );
+  }
+
+  const body2 = await readJson<{ data?: T }>(res);
+  if (!body2?.data) {
+    throw new PipedriveError("O Pipedrive não retornou o registro criado.");
+  }
+  return body2.data;
+}
+
+/** Busca por termo (usado para reaproveitar organização/pessoa existente). */
+async function search<T extends { id: number; name?: string | null }>(
+  config: PipedriveConfig,
+  resource: "organizations" | "persons",
+  term: string
+): Promise<T | null> {
+  if (term.trim().length < 2) return null;
+  try {
+    const domain = config.domain || (await resolveCompanyDomain(config.token));
+    const url = new URL(
+      `${baseUrl({ ...config, domain }, API_VERSION)}/${resource}/search`
+    );
+    url.searchParams.set("term", term.trim());
+    url.searchParams.set("fields", "name");
+    url.searchParams.set("exact_match", "true");
+    url.searchParams.set("limit", "1");
+
+    const res = await fetch(url, {
+      headers: { "x-api-token": config.token, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+
+    const body = (await res.json()) as {
+      data?: { items?: { item?: T }[] } | null;
+    };
+    return body.data?.items?.[0]?.item ?? null;
+  } catch {
+    return null; // busca é otimização; se falhar, criamos um novo
+  }
+}
+
 // ─── Endpoints ────────────────────────────────────────────────────────────
 
 export const pipedrive = {
@@ -323,7 +409,7 @@ export const pipedrive = {
   deals: (c: PipedriveConfig) =>
     fetchAll<PdDeal>(c, "deals", {
       // os campos de atividade saíram do objeto padrão na v2
-      include_fields: "next_activity_id,last_activity_id",
+      include_fields: "next_activity_id,last_activity_id,first_won_time",
       sort_by: "update_time",
       sort_direction: "desc",
     }),
@@ -358,5 +444,55 @@ export const pipedrive = {
   ping: async (c: PipedriveConfig): Promise<boolean> => {
     await request(c, "pipelines", { limit: 1 });
     return true;
+  },
+
+  // ── Escrita ─────────────────────────────────────────────────────────────
+
+  /** Reaproveita a organização com esse nome exato, ou cria uma nova. */
+  findOrCreateOrganization: async (
+    c: PipedriveConfig,
+    name: string
+  ): Promise<PdOrganization> => {
+    const found = await search<PdOrganization>(c, "organizations", name);
+    if (found) return found;
+    return post<PdOrganization>(c, "organizations", { name: name.trim() });
+  },
+
+  findOrCreatePerson: async (
+    c: PipedriveConfig,
+    name: string,
+    orgId?: number | null
+  ): Promise<PdPerson> => {
+    const found = await search<PdPerson>(c, "persons", name);
+    if (found) return found;
+    return post<PdPerson>(c, "persons", {
+      name: name.trim(),
+      ...(orgId ? { org_id: orgId } : {}),
+    });
+  },
+
+  createDeal: async (
+    c: PipedriveConfig,
+    deal: {
+      title: string;
+      value?: number | null;
+      currency?: string;
+      person_id?: number | null;
+      org_id?: number | null;
+      pipeline_id?: number | null;
+      stage_id?: number | null;
+      expected_close_date?: string | null;
+    }
+  ): Promise<PdDeal> => {
+    const body: Record<string, unknown> = { title: deal.title.trim() };
+    if (deal.value != null) body.value = deal.value;
+    if (deal.currency) body.currency = deal.currency;
+    if (deal.person_id) body.person_id = deal.person_id;
+    if (deal.org_id) body.org_id = deal.org_id;
+    if (deal.pipeline_id) body.pipeline_id = deal.pipeline_id;
+    if (deal.stage_id) body.stage_id = deal.stage_id;
+    if (deal.expected_close_date)
+      body.expected_close_date = deal.expected_close_date;
+    return post<PdDeal>(c, "deals", body);
   },
 };

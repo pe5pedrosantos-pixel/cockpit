@@ -118,6 +118,11 @@ export const pipelineDeals = pgTable("pipeline_deals", {
   stageOrder: integer("stage_order"),
   status: text("status").default("open"), // open | won | lost
   expectedCloseDate: date("expected_close_date"),
+  wonTime: timestamp("won_time"),
+  // ── anotações locais (não vêm do Pipedrive e sobrevivem à sincronização)
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  monthlyValue: numeric("monthly_value", { precision: 14, scale: 2 }),
+  contractMonths: integer("contract_months"),
   lastActivityAt: timestamp("last_activity_at"),
   nextActivityAt: timestamp("next_activity_at"),
   nextActivitySubject: text("next_activity_subject"),

@@ -25,6 +25,8 @@ import { integrations, pipelineDeals } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { isPipedriveConfigured } from "@/lib/pipedrive/client";
 import { SyncButton } from "@/components/sync-button";
+import { WonDeals, WonHeader } from "@/components/won-deals";
+import { monthlyOf, summarizeRevenue, wonDate } from "@/lib/revenue";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,12 @@ export default async function DashboardPage() {
     db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "open")),
     db.select().from(integrations).where(eq(integrations.provider, "pipedrive")),
   ]);
+
+  const wonDeals = await db
+    .select()
+    .from(pipelineDeals)
+    .where(eq(pipelineDeals.status, "won"));
+  const revenue = summarizeRevenue(wonDeals);
 
   const today = todayISO();
   const overdueActivities = openDeals.filter(
@@ -206,6 +214,71 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Negócios fechados e receita recorrente */}
+      {wonDeals.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Fechado no mês
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-success">
+                  {brl(revenue.wonThisMonth)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {revenue.countThisMonth}{" "}
+                  {revenue.countThisMonth === 1 ? "negócio" : "negócios"} ·{" "}
+                  {brl(revenue.wonThisYear)} no ano
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Receita recorrente (MRR)
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">
+                  {brl(revenue.mrr)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {revenue.mrr > 0
+                    ? `${brl(revenue.mrr * 12)} por ano`
+                    : "Marque os contratos recorrentes ao lado →"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
+                <WonHeader count={revenue.countThisMonth} />
+              </CardTitle>
+              <Link
+                href="/funil?status=won"
+                className="text-xs font-medium text-indigo-600 hover:underline"
+              >
+                Ver todos
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <WonDeals
+                deals={revenue.recent.map((d) => ({
+                  id: d.id,
+                  title: d.title,
+                  orgName: d.orgName,
+                  value: parseFloat(d.value ?? "0"),
+                  wonAt: wonDate(d),
+                  isRecurring: d.isRecurring,
+                  monthly: monthlyOf(d),
+                }))}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Tarefas de hoje */}
       <Card>

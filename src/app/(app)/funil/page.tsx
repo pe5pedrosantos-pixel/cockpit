@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { integrations, pipelineDeals } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { DealFormDialog, type StageOption } from "@/components/deal-form";
 import { FunilFilters } from "@/components/funil-filters";
 import { SyncButton } from "@/components/sync-button";
 import { isPipedriveConfigured } from "@/lib/pipedrive/client";
@@ -43,6 +44,31 @@ export default async function FunilPage({
       ? ((integration.meta as { lastError?: string } | null)?.lastError ?? null)
       : null;
 
+  // etapas disponíveis para o formulário de novo negócio
+  const stageOptions: StageOption[] = [
+    ...new Map(
+      allDeals
+        .filter((d) => d.stageId)
+        .map((d) => [
+          d.stageId as number,
+          {
+            id: d.stageId as number,
+            name: d.stageName ?? "Etapa",
+            pipelineId: d.pipelineId,
+            pipelineName: d.pipelineName,
+            order: d.stageOrder ?? 999,
+          },
+        ])
+    ).values(),
+  ]
+    .sort((a, b) => a.order - b.order)
+    .map(({ id, name, pipelineId, pipelineName }) => ({
+      id,
+      name,
+      pipelineId,
+      pipelineName,
+    }));
+
   // ── vazio: integração ainda não trouxe dados ────────────────────────────
   if (allDeals.length === 0) {
     return (
@@ -57,10 +83,13 @@ export default async function FunilPage({
               gerenciado lá.
             </p>
           </div>
-          <SyncButton
-            lastSyncAt={lastSyncAt?.toISOString() ?? null}
-            configured={configured}
-          />
+          <div className="flex items-center gap-2">
+            {configured && <DealFormDialog stages={[]} />}
+            <SyncButton
+              lastSyncAt={lastSyncAt?.toISOString() ?? null}
+              configured={configured}
+            />
+          </div>
         </header>
 
         <Card>
@@ -170,11 +199,14 @@ export default async function FunilPage({
               : "Espelho de leitura do Pipedrive"}
           </p>
         </div>
-        <SyncButton
-          lastSyncAt={lastSyncAt?.toISOString() ?? null}
-          configured={configured}
-          auto
-        />
+        <div className="flex items-center gap-2">
+          <DealFormDialog stages={stageOptions} />
+          <SyncButton
+            lastSyncAt={lastSyncAt?.toISOString() ?? null}
+            configured={configured}
+            auto
+          />
+        </div>
       </header>
 
       {syncError && (
