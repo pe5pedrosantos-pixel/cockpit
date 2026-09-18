@@ -11,7 +11,9 @@ export async function middleware(req: NextRequest) {
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname.startsWith("/api/health")
+    pathname.startsWith("/api/health") ||
+    // protegida pelo CRON_SECRET, não pela sessão
+    pathname.startsWith("/api/cron")
   ) {
     return NextResponse.next();
   }

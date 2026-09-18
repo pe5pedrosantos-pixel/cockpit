@@ -45,26 +45,28 @@ export async function getDeliverables(companyId?: number, monthRef?: string) {
 export async function getMonthSummaries(
   monthRef: string
 ): Promise<CompanyMonthSummary[]> {
-  const list = await db
-    .select()
-    .from(companies)
-    .where(and(eq(companies.isActive, true), eq(companies.hasDeliverables, true)))
-    .orderBy(asc(companies.name));
-
-  const summaries: CompanyMonthSummary[] = [];
-  for (const company of list) {
-    const items = await db
+  // duas consultas no total — nunca uma por empresa
+  const [list, items] = await Promise.all([
+    db
       .select()
-      .from(deliverables)
+      .from(companies)
       .where(
-        and(
-          eq(deliverables.companyId, company.id),
-          eq(deliverables.monthRef, monthRef)
-        )
-      );
-    summaries.push(summarizeCompanyMonth(company, monthRef, items));
+        and(eq(companies.isActive, true), eq(companies.hasDeliverables, true))
+      )
+      .orderBy(asc(companies.name)),
+    db.select().from(deliverables).where(eq(deliverables.monthRef, monthRef)),
+  ]);
+
+  const byCompany = new Map<number, typeof items>();
+  for (const item of items) {
+    const arr = byCompany.get(item.companyId);
+    if (arr) arr.push(item);
+    else byCompany.set(item.companyId, [item]);
   }
-  return summaries;
+
+  return list.map((company) =>
+    summarizeCompanyMonth(company, monthRef, byCompany.get(company.id) ?? [])
+  );
 }
 
 export async function getTasks() {

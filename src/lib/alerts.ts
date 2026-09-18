@@ -83,9 +83,17 @@ export function summarizeCompanyMonth(
 }
 
 /** Gera alertas em linguagem natural — usa somente dados reais cadastrados. */
+export interface CommercialSnapshot {
+  /** atividades do Pipedrive com prazo vencido */
+  overdueActivities: number;
+  /** negócios abertos sem próxima atividade agendada */
+  noFollowUp: number;
+}
+
 export function buildAlerts(
   summaries: CompanyMonthSummary[],
-  overdueTasks: Task[]
+  overdueTasks: Task[],
+  commercial?: CommercialSnapshot
 ): Alert[] {
   const alerts: Alert[] = [];
   const today = todayISO();
@@ -148,6 +156,29 @@ export function buildAlerts(
         overdueTasks.length === 1 ? "tarefa está atrasada" : "tarefas estão atrasadas"
       }.`,
     });
+  }
+
+  if (commercial) {
+    if (commercial.overdueActivities > 0) {
+      alerts.push({
+        level: "critical",
+        message: `${commercial.overdueActivities} ${
+          commercial.overdueActivities === 1
+            ? "atividade comercial está atrasada"
+            : "atividades comerciais estão atrasadas"
+        } no funil da SOBE.`,
+      });
+    }
+    if (commercial.noFollowUp > 0) {
+      alerts.push({
+        level: "warning",
+        message: `${commercial.noFollowUp} ${
+          commercial.noFollowUp === 1
+            ? "negócio aberto está"
+            : "negócios abertos estão"
+        } sem próxima atividade agendada — risco de esfriar.`,
+      });
+    }
   }
 
   const order: Record<AlertLevel, number> = { critical: 0, warning: 1, ok: 2 };

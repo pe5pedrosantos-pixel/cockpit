@@ -1,132 +1,340 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { asc } from "drizzle-orm";
+import { ArrowRight, Building2, CalendarClock, User } from "lucide-react";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { pipelineDeals } from "@/lib/db/schema";
+import { integrations, pipelineDeals } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { brl, dateShort } from "@/lib/format";
+import { FunilFilters } from "@/components/funil-filters";
+import { SyncButton } from "@/components/sync-button";
+import { isPipedriveConfigured } from "@/lib/pipedrive/client";
+import { brl, dateShort, todayISO } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function FunilPage() {
-  const deals = await db
-    .select()
-    .from(pipelineDeals)
-    .orderBy(asc(pipelineDeals.stageOrder));
+function sameDay(a: Date, iso: string) {
+  return a.toISOString().slice(0, 10) === iso;
+}
 
-  const open = deals.filter((d) => d.status === "open");
-  const total = open.reduce((s, d) => s + parseFloat(d.value ?? "0"), 0);
-  const inProposal = open.filter((d) =>
-    (d.stageName ?? "").toLowerCase().includes("proposta")
-  );
-  const inNegotiation = open.filter((d) =>
-    (d.stageName ?? "").toLowerCase().includes("negocia")
-  );
+export default async function FunilPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    etapa?: string;
+    responsavel?: string;
+    empresa?: string;
+    status?: string;
+    valorMin?: string;
+    ate?: string;
+  }>;
+}) {
+  const filters = await searchParams;
+  const configured = isPipedriveConfigured();
 
-  const stages = [...new Set(open.map((d) => d.stageName ?? "Sem etapa"))];
+  const [allDeals, [integration]] = await Promise.all([
+    db.select().from(pipelineDeals).orderBy(asc(pipelineDeals.stageOrder)),
+    db.select().from(integrations).where(eq(integrations.provider, "pipedrive")),
+  ]);
 
-  const tiles = [
-    { label: "Pipeline total", value: brl(total) },
-    { label: "Negócios abertos", value: open.length },
-    { label: "Em proposta", value: inProposal.length },
-    { label: "Em negociação", value: inNegotiation.length },
-  ];
+  const lastSyncAt = integration?.lastSyncAt ?? null;
+  const syncError =
+    integration?.status === "error"
+      ? ((integration.meta as { lastError?: string } | null)?.lastError ?? null)
+      : null;
 
-  return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Funil de Vendas · SOBE
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Espelho de leitura do Pipedrive — o pipeline continua sendo gerenciado
-          lá.
-        </p>
-      </header>
+  // ── vazio: integração ainda não trouxe dados ────────────────────────────
+  if (allDeals.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Funil de Vendas · SOBE
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Espelho de leitura do Pipedrive — o pipeline continua sendo
+              gerenciado lá.
+            </p>
+          </div>
+          <SyncButton
+            lastSyncAt={lastSyncAt?.toISOString() ?? null}
+            configured={configured}
+          />
+        </header>
 
-      {deals.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-start gap-3 p-8">
-            <Badge tone="primary">Fase 2</Badge>
+            <Badge tone={configured ? "warning" : "primary"}>
+              {configured ? "Sem dados" : "Não conectado"}
+            </Badge>
             <h2 className="text-lg font-semibold">
-              Integração com o Pipedrive
+              {configured
+                ? "Nenhum negócio sincronizado ainda"
+                : "Integração com o Pipedrive não configurada"}
             </h2>
             <p className="max-w-xl text-sm text-muted-foreground">
-              Esta área mostrará o Kanban do funil comercial da SOBE (Novo lead
-              → Contato → Qualificação → Reunião → Proposta → Negociação →
-              Ganho/Perdido) com resumo de pipeline, filtros e atividades — tudo
-              lido do Pipedrive via API e armazenado localmente. A estrutura de
-              dados já está pronta; falta apenas configurar o token e ativar a
-              sincronização.
+              {configured
+                ? "Clique em “Sincronizar agora” para trazer os negócios, etapas e atividades do Pipedrive."
+                : "Adicione PIPEDRIVE_API_TOKEN e PIPEDRIVE_COMPANY_DOMAIN nas variáveis de ambiente para ativar o funil."}
             </p>
+            {syncError && (
+              <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+                {syncError}
+              </p>
+            )}
             <Link
               href="/integracoes"
               className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline"
             >
-              Configurar integração <ArrowRight className="h-3.5 w-3.5" />
+              Ir para Integrações <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {tiles.map((t) => (
-              <Card key={t.label}>
-                <CardContent className="p-4">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {t.label}
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums">
-                    {t.value}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      </div>
+    );
+  }
 
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {stages.map((stage) => {
-              const stageDeals = open.filter(
-                (d) => (d.stageName ?? "Sem etapa") === stage
-              );
-              return (
-                <div
-                  key={stage}
-                  className="flex w-72 shrink-0 flex-col gap-2.5 rounded-xl border border-border bg-muted/50 p-3"
-                >
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      {stage}
-                    </span>
-                    <Badge tone="outline">{stageDeals.length}</Badge>
-                  </div>
-                  {stageDeals.map((d) => (
+  // ── filtros ─────────────────────────────────────────────────────────────
+  const statusFilter = filters.status ?? "open";
+  const minValue = filters.valorMin ? parseFloat(filters.valorMin) : null;
+
+  const deals = allDeals.filter((d) => {
+    if (statusFilter !== "all" && (d.status ?? "open") !== statusFilter)
+      return false;
+    if (filters.etapa && d.stageName !== filters.etapa) return false;
+    if (filters.responsavel && d.ownerName !== filters.responsavel) return false;
+    if (filters.empresa && d.orgName !== filters.empresa) return false;
+    if (minValue !== null && parseFloat(d.value ?? "0") < minValue) return false;
+    if (filters.ate) {
+      if (!d.expectedCloseDate || d.expectedCloseDate > filters.ate) return false;
+    }
+    return true;
+  });
+
+  const today = todayISO();
+  const total = deals.reduce((s, d) => s + parseFloat(d.value ?? "0"), 0);
+  const open = deals.filter((d) => (d.status ?? "open") === "open");
+  const inProposal = deals.filter((d) =>
+    (d.stageName ?? "").toLowerCase().includes("proposta")
+  );
+  const inNegotiation = deals.filter((d) =>
+    (d.stageName ?? "").toLowerCase().includes("negocia")
+  );
+  const overdueActivities = deals.filter(
+    (d) => d.nextActivityAt && d.nextActivityAt.toISOString().slice(0, 10) < today
+  );
+  const noNextActivity = open.filter((d) => !d.nextActivityAt);
+
+  const tiles = [
+    { label: "Pipeline total", value: brl(total) },
+    { label: "Negócios", value: deals.length },
+    { label: "Em proposta", value: inProposal.length },
+    { label: "Em negociação", value: inNegotiation.length },
+    { label: "Ativ. atrasadas", value: overdueActivities.length },
+    { label: "Sem follow-up", value: noNextActivity.length },
+  ];
+
+  // colunas na ordem das etapas do Pipedrive
+  const stageOrder = new Map<string, number>();
+  for (const d of allDeals) {
+    const name = d.stageName ?? "Sem etapa";
+    const order = d.stageOrder ?? 999;
+    if (!stageOrder.has(name) || order < stageOrder.get(name)!) {
+      stageOrder.set(name, order);
+    }
+  }
+  const stages = [...stageOrder.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([name]) => name);
+
+  const owners = [
+    ...new Set(allDeals.map((d) => d.ownerName).filter(Boolean)),
+  ].sort() as string[];
+  const companies = [
+    ...new Set(allDeals.map((d) => d.orgName).filter(Boolean)),
+  ].sort() as string[];
+
+  const visibleStages = filters.etapa ? [filters.etapa] : stages;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Funil de Vendas · SOBE
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {lastSyncAt
+              ? `Sincronizado do Pipedrive em ${lastSyncAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}`
+              : "Espelho de leitura do Pipedrive"}
+          </p>
+        </div>
+        <SyncButton
+          lastSyncAt={lastSyncAt?.toISOString() ?? null}
+          configured={configured}
+          auto
+        />
+      </header>
+
+      {syncError && (
+        <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+          Última sincronização falhou: {syncError}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {tiles.map((t) => (
+          <Card key={t.label}>
+            <CardContent className="p-3.5">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {t.label}
+              </p>
+              <p className="mt-0.5 text-xl font-semibold tabular-nums">
+                {t.value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <FunilFilters
+        stages={stages}
+        owners={owners}
+        companies={companies}
+        current={filters}
+      />
+
+      {deals.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            Nenhum negócio corresponde a esses filtros.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-3">
+          {visibleStages.map((stage) => {
+            const stageDeals = deals.filter(
+              (d) => (d.stageName ?? "Sem etapa") === stage
+            );
+            const stageTotal = stageDeals.reduce(
+              (s, d) => s + parseFloat(d.value ?? "0"),
+              0
+            );
+            return (
+              <div
+                key={stage}
+                className="flex w-[19rem] shrink-0 flex-col gap-2.5 rounded-xl border border-border bg-muted/50 p-3"
+              >
+                <div className="flex items-baseline justify-between px-1">
+                  <span className="truncate text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    {stage}
+                  </span>
+                  <Badge tone="outline">{stageDeals.length}</Badge>
+                </div>
+                <p className="-mt-1.5 px-1 text-[11px] tabular-nums text-muted-foreground">
+                  {brl(stageTotal)}
+                </p>
+
+                {stageDeals.map((d) => {
+                  const nextISO = d.nextActivityAt
+                    ?.toISOString()
+                    .slice(0, 10);
+                  const overdue = nextISO && nextISO < today;
+                  const dueToday = d.nextActivityAt
+                    ? sameDay(d.nextActivityAt, today)
+                    : false;
+                  return (
                     <div
                       key={d.id}
-                      className="rounded-lg border border-border bg-card p-3 shadow-sm"
+                      className={cn(
+                        "rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md",
+                        overdue && "border-red-200"
+                      )}
                     >
-                      <p className="text-sm font-medium">{d.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {d.orgName} · {d.personName}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between text-xs">
-                        <strong className="tabular-nums">
-                          {brl(parseFloat(d.value ?? "0"))}
-                        </strong>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium leading-snug">
+                          {d.title}
+                        </p>
+                        {d.status === "won" && (
+                          <Badge tone="success">Ganho</Badge>
+                        )}
+                        {d.status === "lost" && (
+                          <Badge tone="danger">Perdido</Badge>
+                        )}
+                      </div>
+
+                      <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                        {d.orgName && (
+                          <span className="flex items-center gap-1.5">
+                            <Building2 className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{d.orgName}</span>
+                          </span>
+                        )}
+                        {d.personName && (
+                          <span className="flex items-center gap-1.5">
+                            <User className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{d.personName}</span>
+                          </span>
+                        )}
                         {d.expectedCloseDate && (
-                          <span className="text-muted-foreground">
-                            prev. {dateShort(d.expectedCloseDate)}
+                          <span className="flex items-center gap-1.5">
+                            <CalendarClock className="h-3 w-3 shrink-0" />
+                            previsão {dateShort(d.expectedCloseDate)}
                           </span>
                         )}
                       </div>
+
+                      <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
+                        <strong className="text-sm tabular-nums">
+                          {brl(parseFloat(d.value ?? "0"))}
+                        </strong>
+                        {d.ownerName && (
+                          <span className="truncate text-[11px] text-muted-foreground">
+                            {d.ownerName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-1.5 text-[11px]">
+                        {d.nextActivityAt ? (
+                          <span
+                            className={cn(
+                              "flex items-start gap-1",
+                              overdue
+                                ? "font-medium text-danger"
+                                : dueToday
+                                  ? "font-medium text-warning"
+                                  : "text-muted-foreground"
+                            )}
+                          >
+                            {overdue ? "🔴" : dueToday ? "🟡" : "→"}
+                            <span className="truncate">
+                              {d.nextActivitySubject ?? "Próxima atividade"} ·{" "}
+                              {dateShort(d.nextActivityAt.toISOString())}
+                            </span>
+                          </span>
+                        ) : (
+                          (d.status ?? "open") === "open" && (
+                            <span className="text-amber-600">
+                              ⚠ Sem próxima atividade
+                            </span>
+                          )
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </>
+                  );
+                })}
+
+                {stageDeals.length === 0 && (
+                  <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                    Nenhum negócio.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

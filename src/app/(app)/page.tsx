@@ -21,23 +21,42 @@ import {
   todayISO,
 } from "@/lib/format";
 import { db } from "@/lib/db";
-import { pipelineDeals } from "@/lib/db/schema";
+import { integrations, pipelineDeals } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isPipedriveConfigured } from "@/lib/pipedrive/client";
+import { SyncButton } from "@/components/sync-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const monthRef = currentMonthRef();
-  const [summaries, todayTasks, overdueTasks, companies, openDeals] =
-    await Promise.all([
-      getMonthSummaries(monthRef),
-      getTodayTasks(),
-      getOverdueTasks(),
-      getActiveCompanies(),
-      db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "open")),
-    ]);
+  const [
+    summaries,
+    todayTasks,
+    overdueTasks,
+    companies,
+    openDeals,
+    [integration],
+  ] = await Promise.all([
+    getMonthSummaries(monthRef),
+    getTodayTasks(),
+    getOverdueTasks(),
+    getActiveCompanies(),
+    db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "open")),
+    db.select().from(integrations).where(eq(integrations.provider, "pipedrive")),
+  ]);
 
-  const alerts = buildAlerts(summaries, overdueTasks);
+  const today = todayISO();
+  const overdueActivities = openDeals.filter(
+    (d) =>
+      d.nextActivityAt && d.nextActivityAt.toISOString().slice(0, 10) < today
+  ).length;
+  const noFollowUp = openDeals.filter((d) => !d.nextActivityAt).length;
+
+  const alerts = buildAlerts(summaries, overdueTasks, {
+    overdueActivities,
+    noFollowUp,
+  });
   const companyOptions = companies.map((c) => ({ id: c.id, name: c.name }));
   const pipelineTotal = openDeals.reduce(
     (s, d) => s + parseFloat(d.value ?? "0"),
@@ -46,13 +65,20 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {greeting()}, Pedro 👋
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Resumo do dia · {dateLabel(todayISO())} · {monthLabel(monthRef)}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greeting()}, Pedro 👋
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Resumo do dia · {dateLabel(today)} · {monthLabel(monthRef)}
+          </p>
+        </div>
+        <SyncButton
+          lastSyncAt={integration?.lastSyncAt?.toISOString() ?? null}
+          configured={isPipedriveConfigured()}
+          auto
+        />
       </header>
 
       {/* Alertas */}
@@ -76,6 +102,26 @@ export default async function DashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   {openDeals.length} negócios ativos no pipeline
                 </p>
+                <div className="mt-1 flex flex-col gap-0.5 text-xs">
+                  <span
+                    className={
+                      overdueActivities > 0
+                        ? "font-medium text-danger"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {overdueActivities} atividades atrasadas
+                  </span>
+                  <span
+                    className={
+                      noFollowUp > 0
+                        ? "font-medium text-warning"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {noFollowUp} sem follow-up agendado
+                  </span>
+                </div>
                 <Link
                   href="/funil"
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline"

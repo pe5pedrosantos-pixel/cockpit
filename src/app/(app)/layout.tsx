@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema";
 import { Sidebar } from "@/components/sidebar";
@@ -10,6 +10,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // uma única consulta para montar a navegação
   const list = await db
     .select({
       name: companies.name,
@@ -17,18 +18,14 @@ export default async function AppLayout({
       color: companies.color,
     })
     .from(companies)
-    .where(eq(companies.isActive, true))
+    .where(
+      and(eq(companies.isActive, true), eq(companies.hasDeliverables, true))
+    )
     .orderBy(asc(companies.name));
-
-  const withDeliverables = await db
-    .select({ slug: companies.slug })
-    .from(companies)
-    .where(eq(companies.hasDeliverables, true));
-  const dSlugs = new Set(withDeliverables.map((c) => c.slug));
 
   return (
     <div className="min-h-screen">
-      <Sidebar companies={list.filter((c) => dSlugs.has(c.slug))} />
+      <Sidebar companies={list} />
       <main className="md:pl-60">
         <div className="mx-auto max-w-6xl p-4 md:p-8">{children}</div>
       </main>
