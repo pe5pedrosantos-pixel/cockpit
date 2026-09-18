@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cockpit — Plataforma Pessoal de Gestão Comercial e Entregas
 
-## Getting Started
+Cockpit pessoal de trabalho: **comercial + tarefas + entregas + prazos + prioridades** em uma visão única.
 
-First, run the development server:
+- **Fase 1 (este MVP):** Dashboard, empresas, tarefas, entregáveis com Kanban e quantidades, percentual automático, controle mensal, histórico, alertas de prazo e ritmo.
+- **Fase 2 (estrutura pronta):** integração de leitura com o Pipedrive (funil SOBE), com espelho local dos negócios.
+
+## Stack
+
+Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Radix UI · Drizzle ORM · PostgreSQL (Supabase) · Vercel
+
+## Rodando localmente
 
 ```bash
+npm install
+cp .env.example .env   # preencha as variáveis
+npm run db:migrate     # aplica as migrações no banco
+npm run db:seed        # (opcional) dados iniciais: GRID CO, ORKA, SOBE + exemplos
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variáveis de ambiente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variável | Descrição |
+|---|---|
+| `DATABASE_URL` | Connection string do Postgres (Supabase: use o **Transaction pooler**, porta 6543) |
+| `AUTH_SECRET` | Segredo do JWT de sessão (`openssl rand -base64 32`) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Credenciais do único usuário |
+| `PIPEDRIVE_API_TOKEN` / `PIPEDRIVE_COMPANY_DOMAIN` | Fase 2 — deixar vazio por enquanto |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Supabase + Vercel)
 
-## Learn More
+### 1. Banco no Supabase (~5 min)
 
-To learn more about Next.js, take a look at the following resources:
+1. Crie um projeto em [supabase.com](https://supabase.com) (região `sa-east-1` / São Paulo).
+2. Em **Project Settings → Database**, copie a connection string do **Transaction pooler** (`...pooler.supabase.com:6543/postgres`) e troque `[YOUR-PASSWORD]` pela senha do projeto.
+3. No seu computador (ou em qualquer terminal com o repo clonado):
+   ```bash
+   DATABASE_URL="<connection string>" npm run db:migrate
+   DATABASE_URL="<connection string>" npm run db:seed
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. App na Vercel (~5 min)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Em [vercel.com/new](https://vercel.com/new), importe este repositório do GitHub.
+2. Em **Environment Variables**, adicione: `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
+3. Deploy. Pronto — acesse a URL gerada e faça login.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Script | O que faz |
+|---|---|
+| `npm run dev` | Ambiente de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run db:generate` | Gera migração a partir de mudanças no schema (`src/lib/db/schema.ts`) |
+| `npm run db:migrate` | Aplica migrações pendentes |
+| `npm run db:seed` | Popula dados iniciais |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Estrutura
+
+```
+src/
+├── app/
+│   ├── (app)/            # páginas autenticadas (dashboard, entregas, tarefas…)
+│   └── login/
+├── components/           # UI + Kanban + formulários
+└── lib/
+    ├── db/               # schema Drizzle, conexão e seed
+    ├── actions/          # server actions (CRUD)
+    ├── alerts.ts         # alertas e cálculo de ritmo (só dados reais)
+    ├── queries.ts        # consultas
+    └── format.ts         # datas/moeda pt-BR (fuso America/Sao_Paulo)
+```
