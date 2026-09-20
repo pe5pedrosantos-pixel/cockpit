@@ -15,7 +15,7 @@ export default async function CadastrosPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Cadastros</h1>
+        <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">Cadastros</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Empresas e categorias de entrega
         </p>

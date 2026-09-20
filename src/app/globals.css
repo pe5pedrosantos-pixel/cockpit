@@ -88,6 +88,26 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
+/* A rolagem do funil precisa ser vista: barra sempre visível e com contraste. */
+.kanban-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: var(--ink-faint) var(--border);
+}
+.kanban-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.kanban-scroll::-webkit-scrollbar-track {
+  background: var(--border);
+  border-radius: 999px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background: var(--ink-faint);
+  border-radius: 999px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

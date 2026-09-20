@@ -75,7 +75,7 @@ export default async function CalendarioPage({
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Calendário</h1>
+          <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">Calendário</h1>
           <p className="mt-1 text-sm text-ink-muted">
             Tarefas e prazos de entrega no mês
           </p>

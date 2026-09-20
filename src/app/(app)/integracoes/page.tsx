@@ -34,7 +34,7 @@ export default async function IntegracoesPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
+        <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">Integrações</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Sistemas conectados ao cockpit
         </p>

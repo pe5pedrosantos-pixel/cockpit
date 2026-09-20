@@ -84,7 +84,7 @@ export default async function CompanyPage({
             {company.name.slice(0, 2).toUpperCase()}
           </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">
               {company.name}
             </h1>
             {company.description && (

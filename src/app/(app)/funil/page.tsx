@@ -4,9 +4,10 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { integrations, pipelineDeals } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, Stat } from "@/components/ui/card";
 import { DealFormDialog, type StageOption } from "@/components/deal-form";
 import { FunilFilters } from "@/components/funil-filters";
+import { KanbanScroller } from "@/components/kanban-scroller";
 import { SyncButton } from "@/components/sync-button";
 import { isPipedriveConfigured } from "@/lib/pipedrive/client";
 import { brl, dateShort, todayISO } from "@/lib/format";
@@ -75,7 +76,7 @@ export default async function FunilPage({
       <div className="flex flex-col gap-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">
               Funil da SOBE
             </h1>
             <p className="mt-1 text-sm text-ink-muted">
@@ -155,14 +156,25 @@ export default async function FunilPage({
   );
   const noNextActivity = open.filter((d) => !d.nextActivityAt);
 
-  const tiles = [
-    { label: "Pipeline total", value: brl(total) },
+  // só mostramos um indicador quando ele diz alguma coisa: com os valores
+  // em branco no Pipedrive, "Pipeline total R$ 0" só ocupa espaço
+  const tiles: { label: string; value: string | number; attention?: boolean }[] = [
     { label: "Negócios", value: deals.length },
-    { label: "Em proposta", value: inProposal.length },
-    { label: "Em negociação", value: inNegotiation.length },
-    { label: "Ativ. atrasadas", value: overdueActivities.length },
-    { label: "Sem follow-up", value: noNextActivity.length },
   ];
+  if (total > 0) tiles.push({ label: "Valor somado", value: brl(total) });
+  if (inProposal.length > 0)
+    tiles.push({ label: "Em proposta", value: inProposal.length });
+  if (inNegotiation.length > 0)
+    tiles.push({ label: "Em negociação", value: inNegotiation.length });
+  tiles.push({
+    label: "Atividades atrasadas",
+    value: overdueActivities.length,
+    attention: overdueActivities.length > 0,
+  });
+  tiles.push({
+    label: "Sem próximo passo",
+    value: noNextActivity.length,
+  });
 
   // colunas na ordem das etapas do Pipedrive
   const stageOrder = new Map<string, number>();
@@ -190,7 +202,7 @@ export default async function FunilPage({
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">
             Funil da SOBE
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
@@ -215,18 +227,19 @@ export default async function FunilPage({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-3",
+          tiles.length <= 3 ? "md:grid-cols-3" : "md:grid-cols-4 lg:grid-cols-6"
+        )}
+      >
         {tiles.map((t) => (
-          <Card key={t.label}>
-            <CardContent className="p-3.5">
-              <p className="text-[12px] text-ink-muted">
-                {t.label}
-              </p>
-              <p className="mt-0.5 text-xl font-semibold tabular-nums">
-                {t.value}
-              </p>
-            </CardContent>
-          </Card>
+          <Stat
+            key={t.label}
+            label={t.label}
+            value={t.value}
+            tone={t.attention ? "attention" : "default"}
+          />
         ))}
       </div>
 
@@ -244,7 +257,7 @@ export default async function FunilPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-3">
+        <KanbanScroller stages={visibleStages}>
           {visibleStages.map((stage) => {
             const stageDeals = deals.filter(
               (d) => (d.stageName ?? "Sem etapa") === stage
@@ -256,7 +269,7 @@ export default async function FunilPage({
             return (
               <div
                 key={stage}
-                className="flex w-[19rem] shrink-0 flex-col gap-2.5 rounded-xl border border-border bg-black/[0.025] p-3"
+                className="flex w-[17rem] shrink-0 snap-start flex-col gap-2.5 rounded-xl border border-border bg-black/[0.025] p-3"
               >
                 <div className="flex items-baseline justify-between px-1">
                   <span className="truncate text-[12.5px] font-semibold text-ink">
@@ -264,9 +277,11 @@ export default async function FunilPage({
                   </span>
                   <Badge tone="outline">{stageDeals.length}</Badge>
                 </div>
-                <p className="-mt-1.5 px-1 text-[11px] tabular-nums text-ink-muted">
-                  {brl(stageTotal)}
-                </p>
+                {stageTotal > 0 && (
+                  <p className="-mt-1.5 px-1 text-[11px] tabular-nums text-ink-muted">
+                    {brl(stageTotal)}
+                  </p>
+                )}
 
                 {stageDeals.map((d) => {
                   const nextISO = d.nextActivityAt
@@ -276,6 +291,7 @@ export default async function FunilPage({
                   const dueToday = d.nextActivityAt
                     ? sameDay(d.nextActivityAt, today)
                     : false;
+                  const value = parseFloat(d.value ?? "0");
                   return (
                     <div
                       key={d.id}
@@ -317,56 +333,54 @@ export default async function FunilPage({
                         )}
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
-                        <strong className="text-sm tabular-nums">
-                          {brl(parseFloat(d.value ?? "0"))}
-                        </strong>
-                        {d.ownerName && (
-                          <span className="truncate text-[11px] text-ink-muted">
-                            {d.ownerName}
-                          </span>
-                        )}
-                      </div>
+                      {(value > 0 || d.ownerName) && (
+                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
+                          {/* 64 dos 65 negócios não têm valor no Pipedrive —
+                              mostrar "R$ 0" em todos seria ruído */}
+                          {value > 0 ? (
+                            <strong className="text-sm tabular-nums">
+                              {brl(value)}
+                            </strong>
+                          ) : (
+                            <span className="text-[11px] text-ink-faint">
+                              sem valor
+                            </span>
+                          )}
+                          {d.ownerName && (
+                            <span className="truncate text-[11px] text-ink-muted">
+                              {d.ownerName}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
-                      <div className="mt-1.5 text-[11px]">
-                        {d.nextActivityAt ? (
-                          <span
-                            className={cn(
-                              "flex items-start gap-1",
-                              overdue
-                                ? "font-medium text-coral"
-                                : dueToday
-                                  ? "font-medium text-coral"
-                                  : "text-ink-muted"
-                            )}
-                          >
-                            {overdue ? "🔴" : dueToday ? "🟡" : "→"}
-                            <span className="truncate">
-                              {d.nextActivitySubject ?? "Próxima atividade"} ·{" "}
-                              {dateShort(d.nextActivityAt.toISOString())}
-                            </span>
-                          </span>
-                        ) : (
-                          (d.status ?? "open") === "open" && (
-                            <span className="text-coral">
-                              Sem próximo passo
-                            </span>
-                          )
-                        )}
-                      </div>
+                      {d.nextActivityAt && (
+                        <p
+                          className={cn(
+                            "mt-1.5 truncate text-[11px]",
+                            overdue || dueToday
+                              ? "font-medium text-coral"
+                              : "text-ink-muted"
+                          )}
+                        >
+                          {overdue ? "Atrasado: " : dueToday ? "Hoje: " : ""}
+                          {d.nextActivitySubject ?? "Próxima atividade"},{" "}
+                          {dateShort(d.nextActivityAt.toISOString())}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
 
                 {stageDeals.length === 0 && (
-                  <p className="px-1 py-4 text-center text-xs text-ink-muted">
-                    Nenhum negócio.
+                  <p className="px-1 py-4 text-center text-xs text-ink-faint">
+                    Nenhum negócio nesta etapa.
                   </p>
                 )}
               </div>
             );
           })}
-        </div>
+        </KanbanScroller>
       )}
     </div>
   );
