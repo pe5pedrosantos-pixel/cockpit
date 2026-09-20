@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 export const Tabs = TabsPrimitive.Root;
 
+/** Abas sublinhadas: leem como navegação, não como botões. */
 export function TabsList({
   className,
   ...props
@@ -13,7 +14,7 @@ export function TabsList({
   return (
     <TabsPrimitive.List
       className={cn(
-        "inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1",
+        "inline-flex items-center gap-5 border-b border-border",
         className
       )}
       {...props}
@@ -28,7 +29,7 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors cursor-pointer data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+        "-mb-px inline-flex items-center border-b-2 border-transparent pb-2 text-[13.5px] text-ink-muted transition-colors cursor-pointer hover:text-ink data-[state=active]:border-coral data-[state=active]:font-semibold data-[state=active]:text-ink",
         className
       )}
       {...props}
@@ -42,7 +43,7 @@ export function TabsContent({
 }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
-      className={cn("mt-4 focus-visible:outline-none", className)}
+      className={cn("mt-5 focus-visible:outline-none", className)}
       {...props}
     />
   );

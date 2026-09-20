@@ -21,7 +21,7 @@ export interface WonDealRow {
 export function WonDeals({ deals }: { deals: WonDealRow[] }) {
   if (deals.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-ink-muted">
         Nenhum negócio ganho ainda.
       </p>
     );
@@ -61,16 +61,16 @@ function WonDealItem({ deal }: { deal: WonDealRow }) {
     <div className="flex items-center gap-3 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{deal.title}</p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {deal.orgName ?? "—"}
-          {deal.wonAt && ` · fechado em ${dateShort(deal.wonAt)}`}
+        <p className="truncate text-[11.5px] text-ink-muted">
+          {deal.orgName ?? "Sem empresa"}
+          {deal.wonAt && `, fechado em ${dateShort(deal.wonAt)}`}
         </p>
       </div>
 
       <div className="text-right">
         <p className="text-sm font-semibold tabular-nums">{brl(deal.value)}</p>
         {deal.isRecurring && !editing && deal.monthly > 0 && (
-          <p className="text-[11px] text-muted-foreground tabular-nums">
+          <p className="text-[11px] text-ink-muted tabular-nums">
             {brl(deal.monthly)}/mês
           </p>
         )}
@@ -105,8 +105,8 @@ function WonDealItem({ deal }: { deal: WonDealRow }) {
           className={cn(
             "shrink-0 rounded-md p-1.5 transition-colors cursor-pointer",
             deal.isRecurring
-              ? "bg-indigo-50 text-indigo-600"
-              : "text-zinc-300 hover:bg-muted hover:text-zinc-500"
+              ? "bg-attention-bg text-coral"
+              : "text-ink-faint hover:bg-black/[0.04] hover:text-ink-muted"
           )}
           aria-label="Alternar receita recorrente"
         >
@@ -120,7 +120,7 @@ function WonDealItem({ deal }: { deal: WonDealRow }) {
 export function WonHeader({ count }: { count: number }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Trophy className="h-3.5 w-3.5 text-amber-500" />
+      <Trophy className="h-3.5 w-3.5 text-ink-faint" />
       Negócios fechados
       {count > 0 && (
         <Badge tone="success" className="ml-1">

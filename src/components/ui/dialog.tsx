@@ -19,19 +19,22 @@ export function DialogContent({
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-navy/40" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-6 shadow-xl focus:outline-none max-h-[90vh] overflow-y-auto",
+          "fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-paper p-6 shadow-[0_24px_48px_-12px_rgba(15,30,61,0.25)] focus:outline-none",
           className
         )}
         {...props}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <DialogPrimitive.Title className="text-base font-semibold">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <DialogPrimitive.Title className="font-display text-[17px] font-semibold tracking-tight text-ink">
             {title}
           </DialogPrimitive.Title>
-          <DialogPrimitive.Close className="rounded-md p-1 text-muted-foreground hover:bg-muted cursor-pointer">
+          <DialogPrimitive.Close
+            className="-mr-1 -mt-1 rounded p-1 text-ink-faint hover:bg-black/[0.05] hover:text-ink cursor-pointer"
+            aria-label="Fechar"
+          >
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
         </div>

@@ -80,7 +80,7 @@ export function CompanyFormDialog({ initial }: { initial?: CompanyFormData }) {
               type="checkbox"
               name="hasDeliverables"
               defaultChecked={initial?.hasDeliverables ?? true}
-              className="h-4 w-4 rounded border-zinc-300 accent-indigo-600"
+              className="h-4 w-4 rounded border-border-strong accent-coral"
             />
             Gerencio entregáveis de marketing para esta empresa
           </label>
@@ -90,7 +90,7 @@ export function CompanyFormDialog({ initial }: { initial?: CompanyFormData }) {
                 type="checkbox"
                 name="isActive"
                 defaultChecked={initial?.isActive ?? true}
-                className="h-4 w-4 rounded border-zinc-300 accent-indigo-600"
+                className="h-4 w-4 rounded border-border-strong accent-coral"
               />
               Empresa ativa
             </label>

@@ -69,7 +69,7 @@ export default async function EntregasPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Entregas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-ink-muted">
             {company ? company.name : "Todas as empresas"} ·{" "}
             {monthLabel(monthRef)}
           </p>
@@ -93,7 +93,7 @@ export default async function EntregasPage({
         {tiles.map((t) => (
           <Card key={t.label}>
             <CardContent className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[12.5px] text-ink-muted">
                 {t.label}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">

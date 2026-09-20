@@ -27,7 +27,9 @@ export default async function AppLayout({
     <div className="min-h-screen">
       <Sidebar companies={list} />
       <main className="md:pl-60">
-        <div className="mx-auto max-w-6xl p-4 md:p-8">{children}</div>
+        <div className="mx-auto max-w-5xl px-5 py-7 md:px-10 md:py-10">
+          {children}
+        </div>
       </main>
     </div>
   );

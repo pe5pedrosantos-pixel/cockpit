@@ -43,7 +43,7 @@ export function CategoryManager({
             {c.name}
             <button
               aria-label={`Remover ${c.name}`}
-              className="rounded p-0.5 hover:bg-muted cursor-pointer"
+              className="rounded p-0.5 hover:bg-black/[0.04] cursor-pointer"
               onClick={() => {
                 if (confirm(`Remover a categoria "${c.name}"?`))
                   startTransition(() => deleteCategory(c.id));

@@ -18,12 +18,17 @@ export const PRIORITY_LABEL: Record<string, string> = {
   URGENTE: "Urgente",
 };
 
+/**
+ * Prioridade é classificação, não alarme — fica em tons neutros.
+ * O coral é reservado para o que está de fato atrasado, senão o sinal
+ * perde força por repetição.
+ */
 export const PRIORITY_TONE: Record<
   string,
   "default" | "primary" | "warning" | "danger"
 > = {
   BAIXA: "default",
-  MEDIA: "primary",
-  ALTA: "warning",
-  URGENTE: "danger",
+  MEDIA: "default",
+  ALTA: "primary",
+  URGENTE: "primary",
 };

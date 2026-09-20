@@ -29,7 +29,7 @@ export default async function TarefasPage() {
   const listOf = (list: typeof items, empty: string) => (
     <div className="flex flex-col gap-2">
       {list.length === 0 && (
-        <p className="text-sm text-muted-foreground">{empty}</p>
+        <p className="text-sm text-ink-muted">{empty}</p>
       )}
       {list.map((t) => (
         <TaskItem key={t.id} task={t} companies={companyOptions} />
@@ -42,8 +42,8 @@ export default async function TarefasPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tarefas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {open.length} abertas · {views.atrasadas.length} atrasadas
+          <p className="mt-1 text-sm text-ink-muted">
+            {open.length} abertas, {views.atrasadas.length} atrasadas
           </p>
         </div>
         <TaskFormDialog companies={companyOptions} />
@@ -73,10 +73,10 @@ export default async function TarefasPage() {
         </TabsList>
 
         <TabsContent value="hoje">
-          {listOf(views.hoje, "Nenhuma tarefa para hoje. 🎉")}
+          {listOf(views.hoje, "Nenhuma tarefa marcada para hoje.")}
         </TabsContent>
         <TabsContent value="atrasadas">
-          {listOf(views.atrasadas, "Nenhuma tarefa atrasada. 🟢")}
+          {listOf(views.atrasadas, "Nenhuma tarefa atrasada.")}
         </TabsContent>
         <TabsContent value="proximas">
           {listOf(views.proximas, "Nenhuma tarefa futura.")}

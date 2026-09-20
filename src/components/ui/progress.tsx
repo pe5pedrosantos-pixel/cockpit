@@ -1,28 +1,34 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Barra de progresso: magnitude em uma cor só.
+ * Quando a empresa tem cor própria, ela é usada como identidade; senão,
+ * navy. O coral fica reservado para o que precisa de atenção.
+ */
 export function Progress({
   value,
   className,
   color,
+  label,
 }: {
-  value: number; // 0–100
+  value: number;
   className?: string;
   color?: string;
+  label?: string;
 }) {
   const v = Math.min(Math.max(value, 0), 100);
-  const barColor =
-    color ?? (v >= 100 ? "#16a34a" : v >= 60 ? "#4f46e5" : v >= 30 ? "#d97706" : "#dc2626");
   return (
     <div
-      className={cn("h-2 w-full overflow-hidden rounded-full bg-zinc-100", className)}
+      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-black/[0.07]", className)}
       role="progressbar"
       aria-valuenow={v}
       aria-valuemin={0}
       aria-valuemax={100}
+      aria-label={label}
     >
       <div
-        className="h-full rounded-full transition-all"
-        style={{ width: `${v}%`, backgroundColor: barColor }}
+        className="h-full rounded-full transition-[width] duration-500"
+        style={{ width: `${v}%`, backgroundColor: color ?? "var(--navy)" }}
       />
     </div>
   );

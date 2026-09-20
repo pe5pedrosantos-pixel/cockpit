@@ -35,21 +35,21 @@ export default async function IntegracoesPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Conexões com sistemas externos
+        <p className="mt-1 text-sm text-ink-muted">
+          Sistemas conectados ao cockpit
         </p>
       </header>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-sm font-bold text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy text-sm font-bold text-white">
               Pd
             </span>
             <div>
               <CardTitle className="text-base">Pipedrive</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Funil comercial da SOBE · somente leitura
+              <p className="text-xs text-ink-muted">
+                Leitura do funil comercial da SOBE
               </p>
             </div>
           </div>
@@ -59,15 +59,15 @@ export default async function IntegracoesPage() {
             }
           >
             {connected
-              ? "🟢 Conectado"
+              ? "Conectado"
               : status === "error"
-                ? "🔴 Erro"
-                : "🔴 Não conectado"}
+                ? "Com erro"
+                : "Não conectado"}
           </Badge>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-black/[0.025] p-4">
             <div className="text-sm">
               <p className="font-medium">
                 {pipedrive?.lastSyncAt
@@ -81,7 +81,7 @@ export default async function IntegracoesPage() {
                     )}`
                   : "Nenhuma sincronização realizada ainda."}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-xs text-ink-muted">
                 {dealRows.length} negócios e {actRows.length} atividades no
                 banco local.
               </p>
@@ -94,13 +94,13 @@ export default async function IntegracoesPage() {
           </div>
 
           {lastError && status === "error" && (
-            <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+            <p className="rounded-lg bg-attention-bg px-3 py-2 text-sm text-coral">
               {lastError}
             </p>
           )}
 
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-2 text-[12.5px] font-semibold text-ink">
               Variáveis de ambiente
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -111,12 +111,12 @@ export default async function IntegracoesPage() {
                 >
                   <code className="text-xs">{v.name}</code>
                   {v.ok ? (
-                    <span className="flex items-center gap-1 text-xs font-medium text-success">
+                    <span className="flex items-center gap-1 text-xs font-medium text-money">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Definido
                     </span>
                   ) : (
                     <span
-                      className={`flex items-center gap-1 text-xs font-medium ${v.required ? "text-danger" : "text-muted-foreground"}`}
+                      className={`flex items-center gap-1 text-xs font-medium ${v.required ? "text-coral" : "text-ink-muted"}`}
                     >
                       <XCircle className="h-3.5 w-3.5" />
                       {v.required ? "Faltando" : "Opcional"}
@@ -129,7 +129,7 @@ export default async function IntegracoesPage() {
 
           <div className="rounded-lg border border-border p-4 text-sm">
             <p className="font-medium">Como funciona</p>
-            <p className="mt-2 text-muted-foreground">
+            <p className="mt-2 text-ink-muted">
               A plataforma lê pipelines, etapas, negócios, organizações,
               pessoas, usuários e atividades da API v2 do Pipedrive e guarda uma
               cópia local — assim nenhuma tela depende da API em tempo real. A
@@ -138,7 +138,7 @@ export default async function IntegracoesPage() {
               clica em “Sincronizar agora”. Nada é escrito de volta no
               Pipedrive: o pipeline continua sendo gerenciado lá.
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-ink-muted">
               As chaves ficam apenas no servidor e nunca são expostas ao
               navegador.
             </p>

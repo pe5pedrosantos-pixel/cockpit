@@ -16,8 +16,8 @@ export default async function CadastrosPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Cadastros</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Empresas, categorias e tipos de entrega
+        <p className="mt-1 text-sm text-ink-muted">
+          Empresas e categorias de entrega
         </p>
       </header>
 
@@ -41,7 +41,7 @@ export default async function CadastrosPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{c.name}</p>
                 {c.description && (
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-ink-muted">
                     {c.description}
                   </p>
                 )}

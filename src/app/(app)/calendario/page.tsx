@@ -76,14 +76,14 @@ export default async function CalendarioPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Calendário</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tarefas e prazos de entrega
+          <p className="mt-1 text-sm text-ink-muted">
+            Tarefas e prazos de entrega no mês
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/calendario?mes=${shiftMonth(monthRef, -1)}`}
-            className="rounded-lg border border-border bg-card p-2 hover:bg-muted"
+            className="rounded-lg border border-border bg-paper p-2 hover:bg-black/[0.04]"
             aria-label="Mês anterior"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -93,7 +93,7 @@ export default async function CalendarioPage({
           </span>
           <Link
             href={`/calendario?mes=${shiftMonth(monthRef, 1)}`}
-            className="rounded-lg border border-border bg-card p-2 hover:bg-muted"
+            className="rounded-lg border border-border bg-paper p-2 hover:bg-black/[0.04]"
             aria-label="Próximo mês"
           >
             <ChevronRight className="h-4 w-4" />
@@ -107,7 +107,7 @@ export default async function CalendarioPage({
             {WEEKDAYS.map((d) => (
               <div
                 key={d}
-                className="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-zinc-400"
+                className="px-1 py-2 text-center text-[11px] font-medium text-ink-faint"
               >
                 {d}
               </div>
@@ -124,8 +124,8 @@ export default async function CalendarioPage({
                   key={i}
                   className={cn(
                     "min-h-20 rounded-lg border border-transparent p-1.5 md:min-h-24",
-                    day !== null && "border-border/60 bg-card",
-                    isToday && "border-indigo-300 bg-indigo-50/50"
+                    day !== null && "border-border/60 bg-paper",
+                    isToday && "border-coral bg-attention-bg"
                   )}
                 >
                   {day !== null && (
@@ -134,8 +134,8 @@ export default async function CalendarioPage({
                         className={cn(
                           "text-xs font-medium tabular-nums",
                           isToday
-                            ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-white"
-                            : "text-muted-foreground"
+                            ? "flex h-5 w-5 items-center justify-center rounded-full bg-navy text-[11px] text-white"
+                            : "text-ink-muted"
                         )}
                       >
                         {day}
@@ -155,7 +155,7 @@ export default async function CalendarioPage({
                           </div>
                         ))}
                         {dayEvents.length > 3 && (
-                          <span className="px-1 text-[10px] text-muted-foreground">
+                          <span className="px-1 text-[10px] text-ink-muted">
                             +{dayEvents.length - 3}
                           </span>
                         )}

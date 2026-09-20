@@ -1,58 +1,36 @@
-import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
 import type { Alert } from "@/lib/alerts";
 import { cn } from "@/lib/utils";
 
-const config = {
-  critical: {
-    icon: OctagonAlert,
-    box: "border-red-200 bg-red-50/70",
-    icn: "text-red-600",
-  },
-  warning: {
-    icon: AlertTriangle,
-    box: "border-amber-200 bg-amber-50/70",
-    icn: "text-amber-600",
-  },
-  ok: {
-    icon: CheckCircle2,
-    box: "border-green-200 bg-green-50/70",
-    icn: "text-green-600",
-  },
-} as const;
-
+/**
+ * Lista do que precisa de atenção. O coral marca o que está atrasado;
+ * o resto fica em tinta comum. Sem ícone de estado: a frase já diz.
+ */
 export function AlertsPanel({
   alerts,
-  emptyMessage = "Tudo em dia. Nenhum alerta no momento.",
+  emptyMessage = "Nada atrasado por aqui.",
 }: {
   alerts: Alert[];
   emptyMessage?: string;
 }) {
   if (alerts.length === 0) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50/70 px-3 py-2.5 text-sm text-green-800">
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
-        {emptyMessage}
-      </div>
-    );
+    return <p className="text-[13.5px] text-ink-muted">{emptyMessage}</p>;
   }
+
   return (
-    <div className="flex flex-col gap-2">
-      {alerts.map((a, i) => {
-        const c = config[a.level];
-        const Icon = c.icon;
-        return (
-          <div
-            key={i}
+    <ul className="flex flex-col gap-2">
+      {alerts.map((a, i) => (
+        <li key={i} className="flex gap-2.5 text-[13.5px] leading-snug">
+          <span
             className={cn(
-              "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
-              c.box
+              "mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full",
+              a.level === "critical" ? "bg-coral" : "bg-ink-faint"
             )}
-          >
-            <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", c.icn)} />
-            <span>{a.message}</span>
-          </div>
-        );
-      })}
-    </div>
+          />
+          <span className={a.level === "critical" ? "text-ink" : "text-ink-muted"}>
+            {a.message}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

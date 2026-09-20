@@ -88,7 +88,7 @@ export default async function CompanyPage({
               {company.name}
             </h1>
             {company.description && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-ink-muted">
                 {company.description}
               </p>
             )}
@@ -109,25 +109,25 @@ export default async function CompanyPage({
               <p className="text-sm font-semibold">
                 {company.name} — {monthLabel(monthRef)}
               </p>
-              <p className="text-sm tabular-nums text-muted-foreground">
-                {summary.totalDelivered} de {summary.totalPlanned} itens ·{" "}
-                <strong className="text-foreground">{summary.percent}%</strong>
+              <p className="text-sm tabular-nums text-ink-muted">
+                {summary.totalDelivered} de {summary.totalPlanned} itens · 
+                <strong className="text-ink">{summary.percent}%</strong>
               </p>
             </div>
             <Progress value={summary.percent} color={company.color} className="h-3" />
             {summary.paceNeeded !== null && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                🟡 Ritmo necessário: ~
+              <p className="mt-2 text-xs text-ink-muted">
+                Ritmo necessário: cerca de 
                 {summary.paceNeeded % 1 === 0
                   ? summary.paceNeeded
                   : summary.paceNeeded.toFixed(1)}{" "}
                 {summary.paceNeeded > 1 ? "entregas" : "entrega"} por dia (
-                {summary.remaining} restantes · {summary.daysLeft} dias)
+                faltam {summary.remaining} em {summary.daysLeft} dias)
               </p>
             )}
             {summary.remaining === 0 && summary.totalPlanned > 0 && (
-              <p className="mt-2 text-xs font-medium text-success">
-                ✅ Todas as entregas do mês concluídas.
+              <p className="mt-2 text-xs font-medium text-money">
+                Todas as entregas do mês estão concluídas.
               </p>
             )}
           </div>
@@ -146,8 +146,8 @@ export default async function CompanyPage({
                   >
                     <div className="mb-1.5 flex items-center justify-between text-xs">
                       <span className="font-medium">{name}</span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {v.delivered}/{v.planned} · {p}%
+                      <span className="tabular-nums text-ink-muted">
+                        {v.delivered} de {v.planned}
                       </span>
                     </div>
                     <Progress value={p} className="h-1.5" />
@@ -183,7 +183,7 @@ export default async function CompanyPage({
         <TabsContent value="entregas" className="flex flex-col gap-4">
           <AlertsPanel
             alerts={alerts.filter((a) => a.level !== "ok")}
-            emptyMessage={`${company.name} está em dia. 🟢`}
+            emptyMessage={`${company.name} está em dia.`}
           />
           <DeliverablesKanban
             items={cards}
@@ -196,7 +196,7 @@ export default async function CompanyPage({
 
         <TabsContent value="tarefas" className="flex flex-col gap-2">
           {companyTasks.length === 0 && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-ink-muted">
               Nenhuma tarefa para {company.name}.
             </p>
           )}
@@ -207,7 +207,7 @@ export default async function CompanyPage({
 
         <TabsContent value="historico" className="flex flex-col gap-3">
           {history.length === 0 && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-ink-muted">
               Ainda não há histórico de entregas.
             </p>
           )}
@@ -218,7 +218,7 @@ export default async function CompanyPage({
                   <p className="text-sm font-semibold">
                     {monthLabel(h.monthRef)}
                   </p>
-                  <p className="text-xs text-muted-foreground tabular-nums">
+                  <p className="text-xs text-ink-muted tabular-nums">
                     {h.totalDelivered}/{h.totalPlanned} itens
                   </p>
                 </div>

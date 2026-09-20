@@ -51,12 +51,12 @@ export function TasksKanban({
             if (id) startTransition(() => setTaskStatus(id, col.key));
           }}
           className={cn(
-            "flex min-h-[160px] flex-col gap-2 rounded-xl border border-border bg-muted/50 p-3 transition-colors",
-            dragOver === col.key && "border-indigo-300 bg-indigo-50/60"
+            "flex min-h-[160px] flex-col gap-2 rounded-xl border border-border bg-black/[0.025] p-3 transition-colors",
+            dragOver === col.key && "border-coral bg-attention-bg"
           )}
         >
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[12.5px] font-semibold text-ink">
               {col.label}
             </span>
             <Badge tone="outline">{grouped[col.key].length}</Badge>
@@ -74,7 +74,7 @@ export function TasksKanban({
             </div>
           ))}
           {grouped[col.key].length === 0 && (
-            <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+            <p className="px-1 py-4 text-center text-xs text-ink-muted">
               Nenhuma tarefa.
             </p>
           )}

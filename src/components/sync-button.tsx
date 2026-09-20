@@ -62,7 +62,7 @@ export function SyncButton({
         <span
           className={cn(
             "text-xs",
-            feedback.ok ? "text-success" : "text-danger"
+            feedback.ok ? "text-money" : "text-coral"
           )}
         >
           {feedback.message}

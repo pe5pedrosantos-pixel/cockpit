@@ -1,19 +1,14 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+const field =
+  "w-full rounded-md border border-border-strong bg-paper px-3 text-[13.5px] text-ink transition-colors placeholder:text-ink-faint focus-visible:border-coral focus-visible:outline-none disabled:opacity-50";
+
 export function Input({
   className,
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "flex h-9 w-full rounded-lg border border-border bg-card px-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <input className={cn(field, "h-9", className)} {...props} />;
 }
 
 export function Textarea({
@@ -21,13 +16,7 @@ export function Textarea({
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <textarea
-      className={cn(
-        "flex min-h-[72px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-        className
-      )}
-      {...props}
-    />
+    <textarea className={cn(field, "min-h-[76px] py-2", className)} {...props} />
   );
 }
 
@@ -35,15 +24,7 @@ export function Select({
   className,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      className={cn(
-        "flex h-9 w-full rounded-lg border border-border bg-card px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <select className={cn(field, "h-9", className)} {...props} />;
 }
 
 export function Label({
@@ -52,10 +33,7 @@ export function Label({
 }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn(
-        "text-xs font-medium text-muted-foreground",
-        className
-      )}
+      className={cn("text-[12.5px] font-medium text-ink-muted", className)}
       {...props}
     />
   );

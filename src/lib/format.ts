@@ -64,6 +64,13 @@ export function brl(value: number | string | null | undefined): string {
   });
 }
 
+/** Número com vírgula decimal, sem casas quando for inteiro. */
+export function num(value: number, decimals = 1): string {
+  return value % 1 === 0
+    ? String(value)
+    : value.toLocaleString("pt-BR", { maximumFractionDigits: decimals });
+}
+
 export function pct(delivered: number, planned: number): number {
   if (planned <= 0) return 0;
   return Math.round((delivered / planned) * 1000) / 10;

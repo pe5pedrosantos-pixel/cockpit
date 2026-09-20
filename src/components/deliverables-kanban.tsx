@@ -102,12 +102,12 @@ export function DeliverablesKanban({
               if (id) move(id, col.key);
             }}
             className={cn(
-              "flex min-h-[180px] flex-col gap-2.5 rounded-xl border border-border bg-muted/50 p-3 transition-colors",
-              dragOver === col.key && "border-indigo-300 bg-indigo-50/60"
+              "flex min-h-[180px] flex-col gap-2.5 rounded-xl border border-border bg-black/[0.025] p-3 transition-colors",
+              dragOver === col.key && "border-coral bg-attention-bg"
             )}
           >
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <span className="text-[12.5px] font-semibold text-ink">
                 {col.label}
               </span>
               <Badge tone="outline">
@@ -126,14 +126,14 @@ export function DeliverablesKanban({
                     e.dataTransfer.setData("text/plain", String(item.id))
                   }
                   className={cn(
-                    "group cursor-grab rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing",
-                    late && "border-red-200"
+                    "group cursor-grab rounded-lg border border-border bg-paper p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing",
+                    late && "border-coral/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{item.title}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-muted">
                         {showCompany && (
                           <span className="inline-flex items-center gap-1">
                             <span
@@ -145,7 +145,7 @@ export function DeliverablesKanban({
                         )}
                         <span>{monthLabel(item.monthRef)}</span>
                         {item.deadline && (
-                          <span className={cn(late && "font-medium text-danger")}>
+                          <span className={cn(late && "font-medium text-coral")}>
                             até {dateShort(item.deadline)}
                           </span>
                         )}
@@ -169,7 +169,7 @@ export function DeliverablesKanban({
                             startTransition(() => deleteDeliverable(item.id));
                         }}
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-danger" />
+                        <Trash2 className="h-3.5 w-3.5 text-coral" />
                       </Button>
                     </div>
                   </div>
@@ -182,8 +182,8 @@ export function DeliverablesKanban({
                   </div>
 
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      <strong className="text-foreground">
+                    <span className="text-xs text-ink-muted tabular-nums">
+                      <strong className="text-ink">
                         {item.deliveredQty}
                       </strong>
                       /{item.plannedQty} entregues
@@ -224,7 +224,7 @@ export function DeliverablesKanban({
             })}
 
             {list.length === 0 && (
-              <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+              <p className="px-1 py-4 text-center text-xs text-ink-muted">
                 Nenhuma entrega aqui.
               </p>
             )}

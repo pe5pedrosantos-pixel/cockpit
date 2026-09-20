@@ -42,7 +42,7 @@ export function DealFormDialog({ stages }: { stages: StageOption[] }) {
       </DialogTrigger>
       <DialogContent title="Novo negócio no Pipedrive">
         <form action={onSubmit} className="flex flex-col gap-4">
-          <p className="-mt-1 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+          <p className="-mt-1 rounded-lg bg-black/[0.03] px-3 py-2 text-xs text-ink-muted">
             O negócio é criado direto no Pipedrive e sincronizado aqui em
             seguida — o CRM continua sendo a fonte única de verdade.
           </p>
@@ -109,7 +109,7 @@ export function DealFormDialog({ stages }: { stages: StageOption[] }) {
           </div>
 
           {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+            <p className="rounded-lg bg-attention-bg px-3 py-2 text-sm text-coral">
               {error}
             </p>
           )}

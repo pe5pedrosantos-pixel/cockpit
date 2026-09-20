@@ -76,9 +76,9 @@ export default async function FunilPage({
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              Funil de Vendas · SOBE
+              Funil da SOBE
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-ink-muted">
               Espelho de leitura do Pipedrive — o pipeline continua sendo
               gerenciado lá.
             </p>
@@ -102,19 +102,19 @@ export default async function FunilPage({
                 ? "Nenhum negócio sincronizado ainda"
                 : "Integração com o Pipedrive não configurada"}
             </h2>
-            <p className="max-w-xl text-sm text-muted-foreground">
+            <p className="max-w-xl text-sm text-ink-muted">
               {configured
                 ? "Clique em “Sincronizar agora” para trazer os negócios, etapas e atividades do Pipedrive."
                 : "Adicione PIPEDRIVE_API_TOKEN e PIPEDRIVE_COMPANY_DOMAIN nas variáveis de ambiente para ativar o funil."}
             </p>
             {syncError && (
-              <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+              <p className="rounded-lg bg-attention-bg px-3 py-2 text-sm text-coral">
                 {syncError}
               </p>
             )}
             <Link
               href="/integracoes"
-              className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline"
+              className="inline-flex items-center gap-1 text-sm font-medium text-coral hover:underline"
             >
               Ir para Integrações <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -191,9 +191,9 @@ export default async function FunilPage({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Funil de Vendas · SOBE
+            Funil da SOBE
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-ink-muted">
             {lastSyncAt
               ? `Sincronizado do Pipedrive em ${lastSyncAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}`
               : "Espelho de leitura do Pipedrive"}
@@ -210,7 +210,7 @@ export default async function FunilPage({
       </header>
 
       {syncError && (
-        <p className="rounded-lg border border-red-200 bg-red-50/70 px-3 py-2 text-sm text-red-800">
+        <p className="rounded-lg bg-attention-bg px-3 py-2 text-sm text-coral">
           Última sincronização falhou: {syncError}
         </p>
       )}
@@ -219,7 +219,7 @@ export default async function FunilPage({
         {tiles.map((t) => (
           <Card key={t.label}>
             <CardContent className="p-3.5">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[12px] text-ink-muted">
                 {t.label}
               </p>
               <p className="mt-0.5 text-xl font-semibold tabular-nums">
@@ -239,7 +239,7 @@ export default async function FunilPage({
 
       {deals.length === 0 ? (
         <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+          <CardContent className="p-8 text-center text-sm text-ink-muted">
             Nenhum negócio corresponde a esses filtros.
           </CardContent>
         </Card>
@@ -256,15 +256,15 @@ export default async function FunilPage({
             return (
               <div
                 key={stage}
-                className="flex w-[19rem] shrink-0 flex-col gap-2.5 rounded-xl border border-border bg-muted/50 p-3"
+                className="flex w-[19rem] shrink-0 flex-col gap-2.5 rounded-xl border border-border bg-black/[0.025] p-3"
               >
                 <div className="flex items-baseline justify-between px-1">
-                  <span className="truncate text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  <span className="truncate text-[12.5px] font-semibold text-ink">
                     {stage}
                   </span>
                   <Badge tone="outline">{stageDeals.length}</Badge>
                 </div>
-                <p className="-mt-1.5 px-1 text-[11px] tabular-nums text-muted-foreground">
+                <p className="-mt-1.5 px-1 text-[11px] tabular-nums text-ink-muted">
                   {brl(stageTotal)}
                 </p>
 
@@ -280,8 +280,8 @@ export default async function FunilPage({
                     <div
                       key={d.id}
                       className={cn(
-                        "rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md",
-                        overdue && "border-red-200"
+                        "rounded-lg border border-border bg-paper p-3 shadow-sm transition-shadow hover:shadow-md",
+                        overdue && "border-coral/30"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -296,7 +296,7 @@ export default async function FunilPage({
                         )}
                       </div>
 
-                      <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                      <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-ink-muted">
                         {d.orgName && (
                           <span className="flex items-center gap-1.5">
                             <Building2 className="h-3 w-3 shrink-0" />
@@ -322,7 +322,7 @@ export default async function FunilPage({
                           {brl(parseFloat(d.value ?? "0"))}
                         </strong>
                         {d.ownerName && (
-                          <span className="truncate text-[11px] text-muted-foreground">
+                          <span className="truncate text-[11px] text-ink-muted">
                             {d.ownerName}
                           </span>
                         )}
@@ -334,10 +334,10 @@ export default async function FunilPage({
                             className={cn(
                               "flex items-start gap-1",
                               overdue
-                                ? "font-medium text-danger"
+                                ? "font-medium text-coral"
                                 : dueToday
-                                  ? "font-medium text-warning"
-                                  : "text-muted-foreground"
+                                  ? "font-medium text-coral"
+                                  : "text-ink-muted"
                             )}
                           >
                             {overdue ? "🔴" : dueToday ? "🟡" : "→"}
@@ -348,8 +348,8 @@ export default async function FunilPage({
                           </span>
                         ) : (
                           (d.status ?? "open") === "open" && (
-                            <span className="text-amber-600">
-                              ⚠ Sem próxima atividade
+                            <span className="text-coral">
+                              Sem próximo passo
                             </span>
                           )
                         )}
@@ -359,7 +359,7 @@ export default async function FunilPage({
                 })}
 
                 {stageDeals.length === 0 && (
-                  <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                  <p className="px-1 py-4 text-center text-xs text-ink-muted">
                     Nenhum negócio.
                   </p>
                 )}

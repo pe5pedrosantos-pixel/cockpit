@@ -33,7 +33,7 @@ export function TaskItem({
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted/40",
+        "group flex items-center gap-3 rounded-lg border border-border bg-paper px-3 py-2.5 transition-colors hover:bg-black/[0.025]",
         done && "opacity-60"
       )}
     >
@@ -44,8 +44,8 @@ export function TaskItem({
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors cursor-pointer",
           done
-            ? "border-green-600 bg-green-600 text-white"
-            : "border-zinc-300 bg-card hover:border-indigo-400"
+            ? "border-money bg-money text-white"
+            : "border-border-strong bg-paper hover:border-coral"
         )}
       >
         {done && <Check className="h-3.5 w-3.5" />}
@@ -55,7 +55,7 @@ export function TaskItem({
         <p className={cn("truncate text-sm font-medium", done && "line-through")}>
           {task.title}
         </p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-muted">
           <span className="inline-flex items-center gap-1">
             {task.companyColor && (
               <span
@@ -66,8 +66,8 @@ export function TaskItem({
             {task.companyName ?? "Pessoal"}
           </span>
           {task.dueDate && (
-            <span className={cn(overdue && "font-semibold text-danger")}>
-              {overdue ? "atrasada · " : ""}
+            <span className={cn(overdue && "font-semibold text-coral")}>
+              {overdue ? "atrasada, " : ""}
               {dateShort(task.dueDate)}
             </span>
           )}
@@ -89,7 +89,7 @@ export function TaskItem({
               startTransition(() => deleteTask(task.id));
           }}
         >
-          <Trash2 className="h-3.5 w-3.5 text-danger" />
+          <Trash2 className="h-3.5 w-3.5 text-coral" />
         </Button>
       </div>
     </div>

@@ -114,24 +114,25 @@ export function buildAlerts(
     }
 
     if (s.remaining > 0 && s.daysLeft > 0) {
+      const prazo =
+        s.daysLeft === 1
+          ? "e hoje é o último dia do mês"
+          : `em ${s.daysLeft} dias`;
+      const ritmo =
+        s.paceNeeded !== null && s.paceNeeded >= 1
+          ? ` — cerca de ${
+              s.paceNeeded % 1 === 0
+                ? s.paceNeeded
+                : s.paceNeeded.toLocaleString("pt-BR", {
+                    maximumFractionDigits: 1,
+                  })
+            } por dia`
+          : "";
       alerts.push({
         level: s.level === "critical" ? "critical" : "warning",
         companySlug: s.company.slug,
-        message: `Estamos no dia ${day} e você ainda precisa entregar ${s.remaining} de ${s.totalPlanned} itens previstos para ${name}. ${
-          s.daysLeft === 1
-            ? "Hoje é o último dia do mês."
-            : `Restam ${s.daysLeft} dias para o fim do mês.`
-        }`,
+        message: `${name}: faltam ${s.remaining} de ${s.totalPlanned} entregas ${prazo}${ritmo}.`,
       });
-      if (s.paceNeeded !== null && s.paceNeeded >= 1) {
-        alerts.push({
-          level: "warning",
-          companySlug: s.company.slug,
-          message: `Ritmo necessário para ${name}: aproximadamente ${
-            s.paceNeeded % 1 === 0 ? s.paceNeeded : s.paceNeeded.toFixed(1)
-          } ${s.paceNeeded > 1 ? "entregas" : "entrega"} por dia para cumprir a meta.`,
-        });
-      }
     }
 
     if (s.remaining === 0 && s.totalPlanned > 0) {

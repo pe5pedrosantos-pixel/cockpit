@@ -1,54 +1,98 @@
 @import "tailwindcss";
 
+/*
+  Pe5 Cockpit — identidade visual
+  Navy, coral e off-white vêm da marca Pedro Santos.
+  Regra do sistema: o coral é a ÚNICA cor viva da interface e significa
+  sempre a mesma coisa — "isto precisa de você". Nada mais compete com ele.
+*/
+
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
-  --card: #ffffff;
-  --card-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --border: #e4e4e7;
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --ring: #a5b4fc;
-  --sidebar: #ffffff;
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
+  /* marca */
+  --navy: #0f1e3d;
+  --coral: #ff5c39;
+  --cream: #f4f1ea;
+
+  /* superfícies */
+  --background: var(--cream);
+  --paper: #ffffff;
+  --sidebar: var(--navy);
+
+  /* tinta */
+  --ink: #0f1e3d;
+  --ink-muted: #5b6579;
+  --ink-faint: #8b93a3;
+  --on-navy: #f4f1ea;
+  --on-navy-muted: #8e9ab5;
+
+  /* estrutura */
+  --border: #e2ddd2;
+  --border-strong: #cdc6b8;
+  --ring: #ff5c39;
+
+  /* atenção (coral) e dinheiro entrando (verde profundo, quantidade e não estado) */
+  --attention: #ff5c39;
+  --attention-bg: #fff0ec;
+  --money: #0b6e4f;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-ring: var(--ring);
+  --color-paper: var(--paper);
   --color-sidebar: var(--sidebar);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
+  --color-navy: var(--navy);
+  --color-coral: var(--coral);
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-on-navy: var(--on-navy);
+  --color-on-navy-muted: var(--on-navy-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ring: var(--ring);
+  --color-attention: var(--attention);
+  --color-attention-bg: var(--attention-bg);
+  --color-money: var(--money);
   --font-sans: var(--font-geist-sans);
+  --font-display: "Montserrat", var(--font-geist-sans), sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-::selection {
-  background: #c7d2fe;
+/* Números são dados: sempre alinhados em coluna. */
+.tabular,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-/* scrollbar discreto */
+::selection {
+  background: #ffd9d0;
+  color: var(--navy);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d4d4d8 transparent;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
