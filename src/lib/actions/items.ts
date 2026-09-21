@@ -274,6 +274,56 @@ export async function deleteItem(id: number) {
   revalidateAll();
 }
 
+const editSchema = z.object({
+  title: z.string().trim().max(300).optional().nullable(),
+  url: z.string().trim().url("Link inválido"),
+  platform: z.enum(Object.keys(PLATFORMS) as [string, ...string[]]),
+  format: z.string().optional().nullable(),
+  publishedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data")
+    .optional()
+    .nullable(),
+});
+
+/** Corrige nome, link, rede, formato ou data de uma publicação. */
+export async function updateItem(
+  id: number,
+  formData: FormData
+): Promise<{ ok: boolean; message: string }> {
+  await requireAuth();
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = editSchema.safeParse({
+    ...raw,
+    title: raw.title || null,
+    format: raw.format || null,
+    publishedAt: raw.publishedAt || null,
+  });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+  const [item] = await db.select().from(deliverableItems).where(eq(deliverableItems.id, id));
+  if (!item) return { ok: false, message: "Publicação não encontrada." };
+
+  const d = parsed.data;
+  await db
+    .update(deliverableItems)
+    .set({
+      title: d.title ?? null,
+      url: d.url,
+      platform: d.platform,
+      format: d.format ?? null,
+      publishedAt: d.publishedAt ?? null,
+      // solta (sem entrega do plano), a publicação acompanha o mês da data
+      ...(!item.deliverableId && d.publishedAt
+        ? { monthRef: d.publishedAt.slice(0, 7) }
+        : {}),
+    })
+    .where(eq(deliverableItems.id, id));
+  revalidateAll();
+  return { ok: true, message: "Publicação atualizada." };
+}
+
 // ─── Metas ────────────────────────────────────────────────────────────────
 
 const goalSchema = z.object({
