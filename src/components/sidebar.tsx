@@ -41,6 +41,7 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
     const active = exact ? pathname === href : pathname.startsWith(href);
     return (
       <Link
+        prefetch={false}
         key={href}
         href={href}
         onClick={() => setOpen(false)}
@@ -87,6 +88,7 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
         const active = pathname === href;
         return (
           <Link
+            prefetch={false}
             key={c.slug}
             href={href}
             onClick={() => setOpen(false)}
