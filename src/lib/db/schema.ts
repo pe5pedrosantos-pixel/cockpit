@@ -77,10 +77,53 @@ export const deliverables = pgTable("deliverables", {
   deliveredQty: integer("delivered_qty").notNull().default(0),
   deadline: date("deadline"),
   status: deliverableStatus("status").notNull().default("PLANEJADO"),
+  /** rede onde a entrega é publicada, quando se aplica */
+  platform: text("platform"),
   owner: text("owner"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Cada peça publicada, com o link. É a prova da entrega e a base das metas:
+ * registrar um link avança o entregável a que pertence e as metas da empresa.
+ */
+export const deliverableItems = pgTable("deliverable_items", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
+  deliverableId: integer("deliverable_id").references(() => deliverables.id, {
+    onDelete: "set null",
+  }),
+  monthRef: text("month_ref").notNull(),
+  url: text("url").notNull(),
+  platform: text("platform").notNull(), // instagram | linkedin | youtube | tiktok | facebook | x | outro
+  format: text("format"), // estatico | carrossel | video | reels | vlog | artigo | outro
+  title: text("title"),
+  publishedAt: date("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Metas recorrentes (ex.: 4 posts por semana no Instagram).
+ * Não precisam ser recriadas todo mês: o progresso é contado a partir dos
+ * links registrados no período.
+ */
+export const goals = pgTable("goals", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  platform: text("platform").notNull(),
+  /** quando definido, só contam itens desse formato (ex.: vlog) */
+  format: text("format"),
+  targetQty: integer("target_qty").notNull(),
+  period: text("period").notNull(), // week | month
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const tasks = pgTable("tasks", {
@@ -140,11 +183,34 @@ export const activities = pgTable("activities", {
     onDelete: "cascade",
   }),
   dealPipedriveId: integer("deal_pipedrive_id"),
+  orgPipedriveId: integer("org_pipedrive_id"),
   subject: text("subject").notNull(),
   type: text("type"),
+  note: text("note"),
   ownerName: text("owner_name"),
   dueAt: timestamp("due_at"),
+  /** a atividade tem horário marcado (senão é "no dia", sem hora) */
+  hasTime: boolean("has_time").notNull().default(false),
   done: boolean("done").notNull().default(false),
+  syncedAt: timestamp("synced_at"),
+});
+
+/** Espelho das organizações do Pipedrive — base da lista de clientes. */
+export const pdOrganizations = pgTable("pd_organizations", {
+  id: serial("id").primaryKey(),
+  pipedriveId: integer("pipedrive_id").notNull().unique(),
+  name: text("name").notNull(),
+  ownerName: text("owner_name"),
+  syncedAt: timestamp("synced_at"),
+});
+
+export const pdPersons = pgTable("pd_persons", {
+  id: serial("id").primaryKey(),
+  pipedriveId: integer("pipedrive_id").notNull().unique(),
+  name: text("name").notNull(),
+  orgPipedriveId: integer("org_pipedrive_id"),
+  email: text("email"),
+  phone: text("phone"),
   syncedAt: timestamp("synced_at"),
 });
 
@@ -161,16 +227,43 @@ export const integrations = pgTable("integrations", {
 export const companiesRelations = relations(companies, ({ many }) => ({
   deliverables: many(deliverables),
   tasks: many(tasks),
+  items: many(deliverableItems),
+  goals: many(goals),
 }));
 
-export const deliverablesRelations = relations(deliverables, ({ one }) => ({
+export const deliverablesRelations = relations(
+  deliverables,
+  ({ one, many }) => ({
+    company: one(companies, {
+      fields: [deliverables.companyId],
+      references: [companies.id],
+    }),
+    category: one(categories, {
+      fields: [deliverables.categoryId],
+      references: [categories.id],
+    }),
+    items: many(deliverableItems),
+  })
+);
+
+export const deliverableItemsRelations = relations(
+  deliverableItems,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [deliverableItems.companyId],
+      references: [companies.id],
+    }),
+    deliverable: one(deliverables, {
+      fields: [deliverableItems.deliverableId],
+      references: [deliverables.id],
+    }),
+  })
+);
+
+export const goalsRelations = relations(goals, ({ one }) => ({
   company: one(companies, {
-    fields: [deliverables.companyId],
+    fields: [goals.companyId],
     references: [companies.id],
-  }),
-  category: one(categories, {
-    fields: [deliverables.categoryId],
-    references: [categories.id],
   }),
 }));
 
@@ -199,6 +292,11 @@ export type Category = typeof categories.$inferSelect;
 export type Deliverable = typeof deliverables.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type PipelineDeal = typeof pipelineDeals.$inferSelect;
+export type DeliverableItem = typeof deliverableItems.$inferSelect;
+export type Goal = typeof goals.$inferSelect;
+export type Activity = typeof activities.$inferSelect;
+export type PdOrganization = typeof pdOrganizations.$inferSelect;
+export type PdPerson = typeof pdPersons.$inferSelect;
 export type DeliverableStatus = Deliverable["status"];
 export type TaskStatus = Task["status"];
 export type TaskPriority = Task["priority"];

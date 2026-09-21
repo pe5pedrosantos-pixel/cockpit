@@ -4,7 +4,11 @@ import type { DeliverableCardData } from "@/components/deliverables-kanban";
 import type { TaskItemData } from "@/components/task-item";
 
 export function toDeliverableCard(
-  d: Deliverable & { company: Company; category?: Category | null }
+  d: Deliverable & {
+    company: Company;
+    category?: Category | null;
+    items?: { id: number }[];
+  }
 ): DeliverableCardData {
   return {
     id: d.id,
@@ -23,6 +27,7 @@ export function toDeliverableCard(
     companyName: d.company.name,
     companyColor: d.company.color,
     categoryName: d.category?.name ?? null,
+    linkCount: d.items?.length ?? 0,
   };
 }
 

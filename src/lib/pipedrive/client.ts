@@ -290,11 +290,23 @@ export interface PdDeal {
 export interface PdPerson {
   id: number;
   name?: string | null;
+  org_id?: number | null;
+  /** v2: listas de { value, primary, label } */
+  emails?: { value?: string; primary?: boolean }[] | null;
+  phones?: { value?: string; primary?: boolean }[] | null;
 }
 
 export interface PdOrganization {
   id: number;
   name?: string | null;
+  owner_id?: number | null;
+}
+
+export interface PdActivityType {
+  key_string: string;
+  name: string;
+  active_flag?: boolean;
+  order_nr?: number;
 }
 
 export interface PdUser {
@@ -308,26 +320,32 @@ export interface PdActivity {
   subject?: string | null;
   type?: string | null;
   deal_id?: number | null;
+  org_id?: number | null;
   owner_id?: number | null;
   due_date?: string | null;
   due_time?: string | null;
+  note?: string | null;
   done?: boolean;
   is_deleted?: boolean;
 }
 
-/** POST em um endpoint da v2. Usado para criar registros no Pipedrive. */
-async function post<T>(
+/**
+ * Escrita no Pipedrive. A v2 cobre negócios, organizações, pessoas e
+ * atividades; notas e tipos de atividade seguem só na v1.
+ */
+async function write<T>(
   config: PipedriveConfig,
   path: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  opts: { method?: "POST" | "PATCH"; version?: "v1" | "v2" } = {}
 ): Promise<T> {
   const domain = config.domain || (await resolveCompanyDomain(config.token));
-  const url = `${baseUrl({ ...config, domain }, API_VERSION)}/${path}`;
+  const url = `${baseUrl({ ...config, domain }, opts.version ?? API_VERSION)}/${path}`;
 
   let res: Response;
   try {
     res = await fetch(url, {
-      method: "POST",
+      method: opts.method ?? "POST",
       headers: {
         "x-api-token": config.token,
         "Content-Type": "application/json",
@@ -342,7 +360,7 @@ async function post<T>(
 
   if (res.status === 401 || res.status === 403) {
     throw new PipedriveError(
-      "O token do Pipedrive não tem permissão para criar registros.",
+      "O token do Pipedrive não tem permissão para essa alteração.",
       res.status
     );
   }
@@ -355,14 +373,14 @@ async function post<T>(
       /* corpo não-JSON */
     }
     throw new PipedriveError(
-      `O Pipedrive recusou a criação (${res.status})${detail}`,
+      `O Pipedrive recusou a alteração (${res.status})${detail}`,
       res.status
     );
   }
 
   const body2 = await readJson<{ data?: T }>(res);
   if (!body2?.data) {
-    throw new PipedriveError("O Pipedrive não retornou o registro criado.");
+    throw new PipedriveError("O Pipedrive não confirmou a alteração.");
   }
   return body2.data;
 }
@@ -455,7 +473,7 @@ export const pipedrive = {
   ): Promise<PdOrganization> => {
     const found = await search<PdOrganization>(c, "organizations", name);
     if (found) return found;
-    return post<PdOrganization>(c, "organizations", { name: name.trim() });
+    return write<PdOrganization>(c, "organizations", { name: name.trim() });
   },
 
   findOrCreatePerson: async (
@@ -465,7 +483,7 @@ export const pipedrive = {
   ): Promise<PdPerson> => {
     const found = await search<PdPerson>(c, "persons", name);
     if (found) return found;
-    return post<PdPerson>(c, "persons", {
+    return write<PdPerson>(c, "persons", {
       name: name.trim(),
       ...(orgId ? { org_id: orgId } : {}),
     });
@@ -493,6 +511,64 @@ export const pipedrive = {
     if (deal.stage_id) body.stage_id = deal.stage_id;
     if (deal.expected_close_date)
       body.expected_close_date = deal.expected_close_date;
-    return post<PdDeal>(c, "deals", body);
+    return write<PdDeal>(c, "deals", body);
+  },
+
+  /** Tipos de atividade configurados na conta (Ligação, Reunião…). v1. */
+  activityTypes: async (c: PipedriveConfig): Promise<PdActivityType[]> => {
+    try {
+      const domain = c.domain || (await resolveCompanyDomain(c.token));
+      const res = await fetch(`${baseUrl({ ...c, domain }, "v1")}/activityTypes`, {
+        headers: { "x-api-token": c.token, Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) return [];
+      const body = (await res.json()) as { data?: PdActivityType[] | null };
+      return (body.data ?? []).filter((t) => t.active_flag !== false);
+    } catch {
+      return [];
+    }
+  },
+
+  createActivity: async (
+    c: PipedriveConfig,
+    a: {
+      subject: string;
+      type: string;
+      deal_id?: number | null;
+      org_id?: number | null;
+      due_date: string;
+      due_time?: string | null;
+      note?: string | null;
+    }
+  ): Promise<PdActivity> => {
+    const body: Record<string, unknown> = {
+      subject: a.subject.trim(),
+      type: a.type,
+      due_date: a.due_date,
+    };
+    if (a.due_time) body.due_time = a.due_time;
+    if (a.deal_id) body.deal_id = a.deal_id;
+    if (a.org_id) body.org_id = a.org_id;
+    if (a.note) body.note = a.note;
+    return write<PdActivity>(c, "activities", body);
+  },
+
+  setActivityDone: async (
+    c: PipedriveConfig,
+    activityId: number,
+    done: boolean
+  ): Promise<PdActivity> =>
+    write<PdActivity>(c, `activities/${activityId}`, { done }, { method: "PATCH" }),
+
+  /** Nota no histórico do negócio. Notas só existem na v1. */
+  addNote: async (
+    c: PipedriveConfig,
+    n: { content: string; deal_id?: number | null; org_id?: number | null }
+  ): Promise<{ id: number }> => {
+    const body: Record<string, unknown> = { content: n.content };
+    if (n.deal_id) body.deal_id = n.deal_id;
+    else if (n.org_id) body.org_id = n.org_id;
+    return write<{ id: number }>(c, "notes", body, { version: "v1" });
   },
 };

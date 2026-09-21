@@ -1,20 +1,24 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Link2, Minus, Plus, Trash2 } from "lucide-react";
 import {
   deleteDeliverable,
   incrementDelivered,
   setDeliverableStatus,
 } from "@/lib/actions/deliverables";
+import { addItem } from "@/lib/actions/items";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Input, Label, Select } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   DeliverableFormDialog,
   type DeliverableFormData,
 } from "@/components/deliverable-form";
-import { dateShort, monthLabel, pct } from "@/lib/format";
+import { dateShort, monthLabel, pct, todayISO } from "@/lib/format";
+import { FORMATS } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
 
 export interface DeliverableCardData extends DeliverableFormData {
@@ -29,6 +33,98 @@ export interface DeliverableCardData extends DeliverableFormData {
   companyName: string;
   companyColor: string;
   categoryName?: string | null;
+  /** quantas entregas têm link registrado */
+  linkCount?: number;
+}
+
+/** Registra uma entrega nova já com o link — soma 1 e guarda a prova. */
+function AddLinkButton({
+  deliverableId,
+  companyId,
+  monthRef,
+}: {
+  deliverableId: number;
+  companyId: number;
+  monthRef: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function submit(fd: FormData) {
+    setError(null);
+    fd.set("deliverableId", String(deliverableId));
+    fd.set("companyId", String(companyId));
+    fd.set("monthRef", monthRef);
+    startTransition(async () => {
+      const r = await addItem(fd);
+      if (r.ok) setOpen(false);
+      else setError(r.message);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="subtle"
+          size="icon"
+          className="h-6 w-6"
+          aria-label="Registrar entrega com link"
+          title="Registrar entrega com link"
+        >
+          <Link2 className="h-3 w-3" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent title="Registrar entrega">
+        <form action={submit} className="flex flex-col gap-4">
+          <p className="-mt-2 text-[13px] text-ink-muted">
+            Conta como uma entrega a mais e guarda o link como prova.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`al-url-${deliverableId}`}>Link da publicação</Label>
+            <Input
+              id={`al-url-${deliverableId}`}
+              name="url"
+              required
+              autoFocus
+              placeholder="https://www.instagram.com/p/…"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`al-fmt-${deliverableId}`}>Formato</Label>
+              <Select id={`al-fmt-${deliverableId}`} name="format" defaultValue="">
+                <option value="">Identificar pelo link</option>
+                {Object.entries(FORMATS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`al-date-${deliverableId}`}>Publicado em</Label>
+              <Input
+                id={`al-date-${deliverableId}`}
+                name="publishedAt"
+                type="date"
+                defaultValue={todayISO()}
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="rounded-md bg-attention-bg px-3 py-2 text-[13px] text-coral">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Registrando…" : "Registrar entrega"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 type ColKey = "PLANEJADO" | "EM_ANDAMENTO" | "CONCLUIDO";
@@ -188,11 +284,23 @@ export function DeliverablesKanban({
                       </strong>
                       /{item.plannedQty} entregues
                       {item.plannedQty - item.deliveredQty > 0 && (
-                        <> · faltam {item.plannedQty - item.deliveredQty}</>
+                        <>, faltam {item.plannedQty - item.deliveredQty}</>
+                      )}
+                      {(item.linkCount ?? 0) > 0 && (
+                        <span className="block text-[11px] text-ink-faint">
+                          {item.linkCount === item.deliveredQty
+                            ? "todas com link"
+                            : `${item.linkCount} com link`}
+                        </span>
                       )}
                     </span>
                     <div className="flex items-center gap-1">
                       {late && <Badge tone="danger">Atrasado</Badge>}
+                      <AddLinkButton
+                        deliverableId={item.id}
+                        companyId={item.companyId}
+                        monthRef={item.monthRef}
+                      />
                       <Button
                         variant="subtle"
                         size="icon"

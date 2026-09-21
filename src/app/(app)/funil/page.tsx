@@ -9,7 +9,8 @@ import { DealFormDialog, type StageOption } from "@/components/deal-form";
 import { FunilFilters } from "@/components/funil-filters";
 import { KanbanScroller } from "@/components/kanban-scroller";
 import { SyncButton } from "@/components/sync-button";
-import { isPipedriveConfigured } from "@/lib/pipedrive/client";
+import { DealDetail } from "@/components/deal-detail";
+import { getPipedriveConfig, isPipedriveConfigured } from "@/lib/pipedrive/client";
 import { brl, dateShort, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export default async function FunilPage({
 }) {
   const filters = await searchParams;
   const configured = isPipedriveConfigured();
+  const pdDomain = getPipedriveConfig()?.domain || null;
 
   const [allDeals, [integration]] = await Promise.all([
     db.select().from(pipelineDeals).orderBy(asc(pipelineDeals.stageOrder)),
@@ -293,10 +295,23 @@ export default async function FunilPage({
                     : false;
                   const value = parseFloat(d.value ?? "0");
                   return (
-                    <div
+                    <DealDetail
                       key={d.id}
+                      deal={{
+                        id: d.id,
+                        pipedriveId: d.pipedriveId,
+                        title: d.title,
+                        orgName: d.orgName,
+                        personName: d.personName,
+                        stageName: d.stageName,
+                        ownerName: d.ownerName,
+                        pipedriveUrl:
+                          pdDomain && d.pipedriveId
+                            ? `https://${pdDomain}.pipedrive.com/deal/${d.pipedriveId}`
+                            : null,
+                      }}
                       className={cn(
-                        "rounded-lg border border-border bg-paper p-3 shadow-sm transition-shadow hover:shadow-md",
+                        "block rounded-lg border border-border bg-paper p-3 shadow-sm transition-shadow hover:shadow-md",
                         overdue && "border-coral/30"
                       )}
                     >
@@ -368,7 +383,7 @@ export default async function FunilPage({
                           {dateShort(d.nextActivityAt.toISOString())}
                         </p>
                       )}
-                    </div>
+                    </DealDetail>
                   );
                 })}
 

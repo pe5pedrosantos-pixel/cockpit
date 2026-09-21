@@ -12,10 +12,15 @@ import { buildAlerts } from "@/lib/alerts";
 import { isPipedriveConfigured } from "@/lib/pipedrive/client";
 import {
   getActiveCompanies,
+  getActiveGoals,
+  getDueActivities,
   getMonthSummaries,
   getOverdueTasks,
+  getRecentItems,
   getTodayTasks,
 } from "@/lib/queries";
+import { goalProgress } from "@/lib/goals";
+import { CrmActivityList } from "@/components/crm-activities";
 import { monthlyOf, summarizeRevenue, wonDate } from "@/lib/revenue";
 import {
   brl,
@@ -53,26 +58,52 @@ export default async function DashboardPage() {
   const monthRef = currentMonthRef();
   const today = todayISO();
 
-  const [summaries, todayTasks, overdueTasks, companies, openDeals, [integration], wonDeals] =
-    await Promise.all([
-      getMonthSummaries(monthRef),
-      getTodayTasks(),
-      getOverdueTasks(),
-      getActiveCompanies(),
-      db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "open")),
-      db.select().from(integrations).where(eq(integrations.provider, "pipedrive")),
-      db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "won")),
-    ]);
+  const [
+    summaries,
+    todayTasks,
+    overdueTasks,
+    companies,
+    openDeals,
+    [integration],
+    wonDeals,
+    goals,
+    recentItems,
+    crmActivities,
+  ] = await Promise.all([
+    getMonthSummaries(monthRef),
+    getTodayTasks(),
+    getOverdueTasks(),
+    getActiveCompanies(),
+    db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "open")),
+    db.select().from(integrations).where(eq(integrations.provider, "pipedrive")),
+    db.select().from(pipelineDeals).where(eq(pipelineDeals.status, "won")),
+    getActiveGoals(),
+    getRecentItems(),
+    getDueActivities(),
+  ]);
 
   const overdueActivities = openDeals.filter(
     (d) => d.nextActivityAt && d.nextActivityAt.toISOString().slice(0, 10) < today
   ).length;
   const noFollowUp = openDeals.filter((d) => !d.nextActivityAt).length;
 
-  const alerts = buildAlerts(summaries, overdueTasks, {
-    overdueActivities,
-    noFollowUp,
-  });
+  const companyById = new Map(companies.map((c) => [c.id, c]));
+  const goalRows = goals
+    .map((g) => ({ g, p: goalProgress(g, recentItems), c: companyById.get(g.companyId) }))
+    .filter((r) => r.c);
+
+  const alerts = [
+    ...buildAlerts(summaries, overdueTasks, { overdueActivities, noFollowUp }),
+    ...goalRows
+      .filter((r) => r.p.behind)
+      .map((r) => ({
+        level: "warning" as const,
+        companySlug: r.c!.slug,
+        message: `${r.c!.name}: ${r.g.title.toLowerCase()} em ${r.p.done} de ${r.g.targetQty} ${
+          r.g.period === "week" ? "esta semana" : "este mês"
+        }, faltam ${r.p.daysLeft} ${r.p.daysLeft === 1 ? "dia" : "dias"}.`,
+      })),
+  ].sort((a, b) => (a.level === b.level ? 0 : a.level === "critical" ? -1 : 1));
   const companyOptions = companies.map((c) => ({ id: c.id, name: c.name }));
   const pipelineTotal = openDeals.reduce((s, d) => s + parseFloat(d.value ?? "0"), 0);
   const revenue = summarizeRevenue(wonDeals);
@@ -236,6 +267,70 @@ export default async function DashboardPage() {
               ))}
             </CardContent>
           </Card>
+        </section>
+      )}
+
+      {/* Metas recorrentes */}
+      {goalRows.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-[15px] font-semibold tracking-tight">
+            Metas da semana e do mês
+          </h2>
+          <Card>
+            <CardContent className="grid gap-x-8 gap-y-4 py-5 sm:grid-cols-2">
+              {goalRows.map(({ g, p, c }) => (
+                <Link key={g.id} href={`/empresas/${c!.slug}`} className="group block">
+                  <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2 text-[13px] group-hover:text-coral">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: c!.color }}
+                      />
+                      <span className="truncate">
+                        <span className="font-medium">{c!.name}</span>{" "}
+                        <span className="text-ink-muted">{g.title}</span>
+                      </span>
+                    </span>
+                    <span
+                      className={`shrink-0 font-display text-[14px] font-extrabold tabular-nums ${
+                        p.behind ? "text-coral" : p.remaining === 0 ? "text-money" : "text-ink"
+                      }`}
+                    >
+                      {p.done}/{g.targetQty}
+                    </span>
+                  </div>
+                  <Progress
+                    value={p.percent}
+                    color={p.behind ? "var(--coral)" : p.remaining === 0 ? "var(--money)" : c!.color}
+                    label={`${c!.name} ${g.title}: ${p.done} de ${g.targetQty}`}
+                  />
+                  <p className="mt-1 text-[11.5px] text-ink-faint">
+                    {g.period === "week" ? "esta semana" : "este mês"}
+                    {p.remaining > 0 &&
+                      `, ${p.daysLeft} ${p.daysLeft === 1 ? "dia restante" : "dias restantes"}`}
+                  </p>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* Atividades comerciais do Pipedrive */}
+      {crmActivities.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">
+              Atividades comerciais
+            </h2>
+            <Link
+              href="/clientes"
+              className="text-[12.5px] text-ink-muted underline-offset-2 hover:text-coral hover:underline"
+            >
+              Ver clientes
+            </Link>
+          </div>
+          <CrmActivityList activities={crmActivities} />
         </section>
       )}
 

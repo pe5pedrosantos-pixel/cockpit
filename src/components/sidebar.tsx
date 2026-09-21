@@ -13,6 +13,7 @@ import {
   Package,
   Plug,
   TrendingUp,
+  Users,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,7 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
 
       {section("Comercial")}
       {item("/funil", "Funil da SOBE", <TrendingUp className="h-4 w-4" />)}
+      {item("/clientes", "Clientes", <Users className="h-4 w-4" />)}
 
       {section("Entregas")}
       {companies.map((c) => {

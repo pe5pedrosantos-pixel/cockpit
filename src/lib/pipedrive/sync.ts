@@ -12,7 +12,13 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { activities, integrations, pipelineDeals } from "@/lib/db/schema";
+import {
+  activities,
+  integrations,
+  pdOrganizations,
+  pdPersons,
+  pipelineDeals,
+} from "@/lib/db/schema";
 import {
   getPipedriveConfig,
   pipedrive,
@@ -208,7 +214,10 @@ export async function syncPipedrive(): Promise<SyncResult> {
         subject: a.subject || "(sem assunto)",
         type: a.type ?? null,
         ownerName: a.owner_id ? (userName.get(a.owner_id) ?? null) : null,
+        orgPipedriveId: a.org_id ?? null,
+        note: a.note ? a.note.slice(0, 4000) : null,
         dueAt: activityDueAt(a),
+        hasTime: Boolean(a.due_time),
         done: Boolean(a.done),
         syncedAt,
       }));
@@ -219,6 +228,34 @@ export async function syncPipedrive(): Promise<SyncResult> {
       for (let i = 0; i < actRows.length; i += CHUNK) {
         await db.insert(activities).values(actRows.slice(i, i + CHUNK));
       }
+    }
+
+    // ── Clientes (organizações e contatos) ────────────────────────────────
+    const primary = (list?: { value?: string; primary?: boolean }[] | null) =>
+      (list?.find((x) => x.primary)?.value ?? list?.[0]?.value ?? null) || null;
+
+    const orgRows = orgs.map((o) => ({
+      pipedriveId: o.id,
+      name: o.name || "(sem nome)",
+      ownerName: o.owner_id ? (userName.get(o.owner_id) ?? null) : null,
+      syncedAt,
+    }));
+    const personRows = persons.map((p) => ({
+      pipedriveId: p.id,
+      name: p.name || "(sem nome)",
+      orgPipedriveId: p.org_id ?? null,
+      email: primary(p.emails),
+      phone: primary(p.phones),
+      syncedAt,
+    }));
+
+    await db.delete(pdOrganizations);
+    for (let i = 0; i < orgRows.length; i += 300) {
+      await db.insert(pdOrganizations).values(orgRows.slice(i, i + 300));
+    }
+    await db.delete(pdPersons);
+    for (let i = 0; i < personRows.length; i += 300) {
+      await db.insert(pdPersons).values(personRows.slice(i, i + 300));
     }
 
     const message = `${dealRows.length} negócios e ${actRows.length} atividades sincronizados.`;

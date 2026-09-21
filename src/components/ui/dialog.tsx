@@ -13,9 +13,11 @@ export function DialogContent({
   className,
   children,
   title,
+  description,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   title: string;
+  description?: string;
 }) {
   return (
     <DialogPrimitive.Portal>
@@ -31,6 +33,11 @@ export function DialogContent({
           <DialogPrimitive.Title className="font-display text-[17px] font-semibold tracking-tight text-ink">
             {title}
           </DialogPrimitive.Title>
+          {description && (
+            <DialogPrimitive.Description className="mt-1 text-[12.5px] text-ink-muted">
+              {description}
+            </DialogPrimitive.Description>
+          )}
           <DialogPrimitive.Close
             className="-mr-1 -mt-1 rounded p-1 text-ink-faint hover:bg-black/[0.05] hover:text-ink cursor-pointer"
             aria-label="Fechar"
