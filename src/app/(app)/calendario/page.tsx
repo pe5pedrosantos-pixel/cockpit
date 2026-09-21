@@ -63,6 +63,18 @@ export default async function CalendarioPage({
       });
   }
 
+  // dentro do dia: horários marcados em ordem ("12h", "13h30"), depois o
+  // que não tem hora, e "fim do dia" por último
+  const timeKey = (label: string) => {
+    const m = label.match(/^\s*(\d{1,2})h(\d{2})?/i);
+    if (m) return Number(m[1]) * 60 + Number(m[2] ?? 0);
+    if (/^\s*fim do dia/i.test(label)) return 24 * 60 + 1;
+    return 24 * 60;
+  };
+  for (const list of events.values()) {
+    list.sort((a, b) => timeKey(a.label) - timeKey(b.label));
+  }
+
   const firstWeekday = new Date(year, month - 1, 1).getDay();
   const totalDays = daysInMonth(monthRef);
   const cells: (number | null)[] = [
@@ -141,7 +153,7 @@ export default async function CalendarioPage({
                         {day}
                       </span>
                       <div className="mt-1 flex flex-col gap-0.5">
-                        {dayEvents.slice(0, 3).map((e, j) => (
+                        {dayEvents.slice(0, 5).map((e, j) => (
                           <div
                             key={j}
                             title={`${e.kind === "entrega" ? "Entrega" : "Tarefa"}: ${e.label}`}
@@ -154,9 +166,9 @@ export default async function CalendarioPage({
                             {e.label}
                           </div>
                         ))}
-                        {dayEvents.length > 3 && (
+                        {dayEvents.length > 5 && (
                           <span className="px-1 text-[10px] text-ink-muted">
-                            +{dayEvents.length - 3}
+                            +{dayEvents.length - 5}
                           </span>
                         )}
                       </div>
