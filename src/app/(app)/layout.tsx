@@ -4,6 +4,8 @@ import { companies } from "@/lib/db/schema";
 import { Sidebar } from "@/components/sidebar";
 
 export const dynamic = "force-dynamic";
+/** uma tela travada falha em 1 minuto, não segura a instância por 5 */
+export const maxDuration = 60;
 
 export default async function AppLayout({
   children,

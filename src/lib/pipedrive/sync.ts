@@ -145,126 +145,137 @@ export async function syncPipedrive(): Promise<SyncResult> {
       };
     });
 
-    if (dealRows.length > 0) {
-      // grava em lotes para não estourar o limite de parâmetros do Postgres
-      const CHUNK = 200;
-      for (let i = 0; i < dealRows.length; i += CHUNK) {
-        await db
-          .insert(pipelineDeals)
-          .values(dealRows.slice(i, i + CHUNK))
-          .onConflictDoUpdate({
-            target: pipelineDeals.pipedriveId,
-            set: {
-              title: sql`excluded.title`,
-              orgId: sql`excluded.org_id`,
-              orgName: sql`excluded.org_name`,
-              personId: sql`excluded.person_id`,
-              personName: sql`excluded.person_name`,
-              ownerId: sql`excluded.owner_id`,
-              ownerName: sql`excluded.owner_name`,
-              value: sql`excluded.value`,
-              currency: sql`excluded.currency`,
-              pipelineId: sql`excluded.pipeline_id`,
-              pipelineName: sql`excluded.pipeline_name`,
-              stageId: sql`excluded.stage_id`,
-              stageName: sql`excluded.stage_name`,
-              stageOrder: sql`excluded.stage_order`,
-              status: sql`excluded.status`,
-              expectedCloseDate: sql`excluded.expected_close_date`,
-              wonTime: sql`excluded.won_time`,
-              // is_recurring / monthly_value ficam de fora de propósito:
-              // são anotações locais e precisam sobreviver à sincronização
-              lastActivityAt: sql`excluded.last_activity_at`,
-              nextActivityAt: sql`excluded.next_activity_at`,
-              nextActivitySubject: sql`excluded.next_activity_subject`,
-              addTime: sql`excluded.add_time`,
-              updateTime: sql`excluded.update_time`,
-              syncedAt: sql`excluded.synced_at`,
-            },
-          });
+    // Todas as gravações numa transação só: quem abre a tela nunca vê o
+    // banco pela metade, e duas sincronizações simultâneas (cron + botão)
+    // entram em fila pelo advisory lock em vez de se atropelarem.
+    let actCount = 0;
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`set local lock_timeout = '15s'`);
+      await tx.execute(sql`set local statement_timeout = '45s'`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('pipedrive_sync'))`);
+
+      if (dealRows.length > 0) {
+        // grava em lotes para não estourar o limite de parâmetros do Postgres
+        const CHUNK = 200;
+        for (let i = 0; i < dealRows.length; i += CHUNK) {
+          await tx
+            .insert(pipelineDeals)
+            .values(dealRows.slice(i, i + CHUNK))
+            .onConflictDoUpdate({
+              target: pipelineDeals.pipedriveId,
+              set: {
+                title: sql`excluded.title`,
+                orgId: sql`excluded.org_id`,
+                orgName: sql`excluded.org_name`,
+                personId: sql`excluded.person_id`,
+                personName: sql`excluded.person_name`,
+                ownerId: sql`excluded.owner_id`,
+                ownerName: sql`excluded.owner_name`,
+                value: sql`excluded.value`,
+                currency: sql`excluded.currency`,
+                pipelineId: sql`excluded.pipeline_id`,
+                pipelineName: sql`excluded.pipeline_name`,
+                stageId: sql`excluded.stage_id`,
+                stageName: sql`excluded.stage_name`,
+                stageOrder: sql`excluded.stage_order`,
+                status: sql`excluded.status`,
+                expectedCloseDate: sql`excluded.expected_close_date`,
+                wonTime: sql`excluded.won_time`,
+                // is_recurring / monthly_value ficam de fora de propósito:
+                // são anotações locais e precisam sobreviver à sincronização
+                lastActivityAt: sql`excluded.last_activity_at`,
+                nextActivityAt: sql`excluded.next_activity_at`,
+                nextActivitySubject: sql`excluded.next_activity_subject`,
+                addTime: sql`excluded.add_time`,
+                updateTime: sql`excluded.update_time`,
+                syncedAt: sql`excluded.synced_at`,
+              },
+            });
+        }
       }
-    }
 
-    // remove negócios que sumiram/foram excluídos no Pipedrive
-    const keptIds = liveDeals.map((d) => d.id);
-    if (keptIds.length > 0) {
-      await db.execute(
-        sql`delete from ${pipelineDeals} where pipedrive_id is not null and pipedrive_id not in ${keptIds}`
+      // remove negócios que sumiram/foram excluídos no Pipedrive
+      const keptIds = liveDeals.map((d) => d.id);
+      if (keptIds.length > 0) {
+        await tx.execute(
+          sql`delete from ${pipelineDeals} where pipedrive_id is not null and pipedrive_id not in ${keptIds}`
+        );
+      } else {
+        await tx.delete(pipelineDeals);
+      }
+
+      // ── Atividades ────────────────────────────────────────────────────────
+      const localDeals = await tx
+        .select({ id: pipelineDeals.id, pipedriveId: pipelineDeals.pipedriveId })
+        .from(pipelineDeals);
+      const localIdByPd = new Map(
+        localDeals
+          .filter((d) => d.pipedriveId != null)
+          .map((d) => [d.pipedriveId as number, d.id])
       );
-    } else {
-      await db.delete(pipelineDeals);
-    }
 
-    // ── Atividades ────────────────────────────────────────────────────────
-    const localDeals = await db
-      .select({ id: pipelineDeals.id, pipedriveId: pipelineDeals.pipedriveId })
-      .from(pipelineDeals);
-    const localIdByPd = new Map(
-      localDeals
-        .filter((d) => d.pipedriveId != null)
-        .map((d) => [d.pipedriveId as number, d.id])
-    );
+      const actRows = acts
+        .filter((a) => !a.is_deleted)
+        .map((a) => ({
+          pipedriveId: a.id,
+          dealPipedriveId: a.deal_id ?? null,
+          dealId: a.deal_id ? (localIdByPd.get(a.deal_id) ?? null) : null,
+          subject: a.subject || "(sem assunto)",
+          type: a.type ?? null,
+          ownerName: a.owner_id ? (userName.get(a.owner_id) ?? null) : null,
+          orgPipedriveId: a.org_id ?? null,
+          note: a.note ? a.note.slice(0, 4000) : null,
+          dueAt: activityDueAt(a),
+          hasTime: Boolean(a.due_time),
+          done: Boolean(a.done),
+          syncedAt,
+        }));
 
-    const actRows = acts
-      .filter((a) => !a.is_deleted)
-      .map((a) => ({
-        pipedriveId: a.id,
-        dealPipedriveId: a.deal_id ?? null,
-        dealId: a.deal_id ? (localIdByPd.get(a.deal_id) ?? null) : null,
-        subject: a.subject || "(sem assunto)",
-        type: a.type ?? null,
-        ownerName: a.owner_id ? (userName.get(a.owner_id) ?? null) : null,
-        orgPipedriveId: a.org_id ?? null,
-        note: a.note ? a.note.slice(0, 4000) : null,
-        dueAt: activityDueAt(a),
-        hasTime: Boolean(a.due_time),
-        done: Boolean(a.done),
+      await tx.delete(activities);
+      if (actRows.length > 0) {
+        const CHUNK = 300;
+        for (let i = 0; i < actRows.length; i += CHUNK) {
+          await tx.insert(activities).values(actRows.slice(i, i + CHUNK));
+        }
+      }
+
+      // ── Clientes (organizações e contatos) ────────────────────────────────
+      const primary = (list?: { value?: string; primary?: boolean }[] | null) =>
+        (list?.find((x) => x.primary)?.value ?? list?.[0]?.value ?? null) || null;
+
+      const orgRows = orgs.map((o) => ({
+        pipedriveId: o.id,
+        name: o.name || "(sem nome)",
+        ownerName: o.owner_id ? (userName.get(o.owner_id) ?? null) : null,
+        syncedAt,
+      }));
+      const personRows = persons.map((p) => ({
+        pipedriveId: p.id,
+        name: p.name || "(sem nome)",
+        orgPipedriveId: p.org_id ?? null,
+        email: primary(p.emails),
+        phone: primary(p.phones),
         syncedAt,
       }));
 
-    await db.delete(activities);
-    if (actRows.length > 0) {
-      const CHUNK = 300;
-      for (let i = 0; i < actRows.length; i += CHUNK) {
-        await db.insert(activities).values(actRows.slice(i, i + CHUNK));
+      await tx.delete(pdOrganizations);
+      for (let i = 0; i < orgRows.length; i += 300) {
+        await tx.insert(pdOrganizations).values(orgRows.slice(i, i + 300));
       }
-    }
+      await tx.delete(pdPersons);
+      for (let i = 0; i < personRows.length; i += 300) {
+        await tx.insert(pdPersons).values(personRows.slice(i, i + 300));
+      }
+      actCount = actRows.length;
+    });
 
-    // ── Clientes (organizações e contatos) ────────────────────────────────
-    const primary = (list?: { value?: string; primary?: boolean }[] | null) =>
-      (list?.find((x) => x.primary)?.value ?? list?.[0]?.value ?? null) || null;
-
-    const orgRows = orgs.map((o) => ({
-      pipedriveId: o.id,
-      name: o.name || "(sem nome)",
-      ownerName: o.owner_id ? (userName.get(o.owner_id) ?? null) : null,
-      syncedAt,
-    }));
-    const personRows = persons.map((p) => ({
-      pipedriveId: p.id,
-      name: p.name || "(sem nome)",
-      orgPipedriveId: p.org_id ?? null,
-      email: primary(p.emails),
-      phone: primary(p.phones),
-      syncedAt,
-    }));
-
-    await db.delete(pdOrganizations);
-    for (let i = 0; i < orgRows.length; i += 300) {
-      await db.insert(pdOrganizations).values(orgRows.slice(i, i + 300));
-    }
-    await db.delete(pdPersons);
-    for (let i = 0; i < personRows.length; i += 300) {
-      await db.insert(pdPersons).values(personRows.slice(i, i + 300));
-    }
-
-    const message = `${dealRows.length} negócios e ${actRows.length} atividades sincronizados.`;
+    const message = `${dealRows.length} negócios e ${actCount} atividades sincronizados.`;
     await recordStatus(
       "connected",
       {
         lastError: null,
         deals: dealRows.length,
-        activities: actRows.length,
+        activities: actCount,
         pipelines: pipelines.length,
       },
       syncedAt
@@ -273,7 +284,7 @@ export async function syncPipedrive(): Promise<SyncResult> {
     return {
       ok: true,
       deals: dealRows.length,
-      activities: actRows.length,
+      activities: actCount,
       message,
       syncedAt,
     };
