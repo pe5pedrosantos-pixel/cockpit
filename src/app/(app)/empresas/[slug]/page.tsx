@@ -83,6 +83,7 @@ export default async function CompanyPage({
       behind: p.behind,
       periodStart: p.period.start,
       periodEnd: p.period.end,
+      previousDone: p.previousDone,
     };
   });
 

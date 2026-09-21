@@ -40,6 +40,27 @@ export interface GoalProgress {
   daysLeft: number;
   /** o ritmo atual indica que a meta não fecha no período */
   behind: boolean;
+  /** quanto foi feito no período anterior (semana ou mês passado) */
+  previousDone: number;
+}
+
+function countInPeriod(
+  goal: Goal,
+  items: DeliverableItem[],
+  period: { start: string; end: string }
+): number {
+  return items.filter((i) => {
+    if (!itemMatchesGoal(i, goal)) return false;
+    const d = itemDate(i);
+    return d >= period.start && d <= period.end;
+  }).length;
+}
+
+/** Dia anterior a uma data ISO. */
+function dayBefore(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Um item conta para a meta se for da mesma rede (e formato, se a meta exigir). */
@@ -60,11 +81,10 @@ export function goalProgress(
   today = todayISO()
 ): GoalProgress {
   const period = goal.period === "week" ? weekRange(today) : monthRange(today);
-  const done = items.filter((i) => {
-    if (!itemMatchesGoal(i, goal)) return false;
-    const d = itemDate(i);
-    return d >= period.start && d <= period.end;
-  }).length;
+  const done = countInPeriod(goal, items, period);
+  const prevDay = dayBefore(period.start);
+  const previous = goal.period === "week" ? weekRange(prevDay) : monthRange(prevDay);
+  const previousDone = countInPeriod(goal, items, previous);
 
   const remaining = Math.max(goal.targetQty - done, 0);
   const left = daysLeft(period.end, today);
@@ -81,5 +101,6 @@ export function goalProgress(
     daysLeft: left,
     // atrasado quando está mais de 1 peça abaixo do esperado para o dia
     behind: remaining > 0 && done + 1 <= Math.floor(expectedByNow),
+    previousDone,
   };
 }

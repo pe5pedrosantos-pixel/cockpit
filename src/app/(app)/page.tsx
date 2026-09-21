@@ -308,6 +308,7 @@ export default async function DashboardPage() {
                     {g.period === "week" ? "esta semana" : "este mês"}
                     {p.remaining > 0 &&
                       `, ${p.daysLeft} ${p.daysLeft === 1 ? "dia restante" : "dias restantes"}`}
+                    {`; ${g.period === "week" ? "semana passada" : "mês passado"} ${p.previousDone} de ${g.targetQty}`}
                   </p>
                 </Link>
               ))}

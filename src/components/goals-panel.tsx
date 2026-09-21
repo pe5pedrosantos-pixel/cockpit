@@ -25,6 +25,7 @@ export interface GoalRow {
   behind: boolean;
   periodStart: string;
   periodEnd: string;
+  previousDone: number;
 }
 
 /** Metas recorrentes com o progresso do período corrente. */
@@ -127,6 +128,10 @@ function GoalCard({
           : goal.behind
             ? `Atrás do ritmo: faltam ${goal.remaining} em ${goal.daysLeft} ${goal.daysLeft === 1 ? "dia" : "dias"}.`
             : `Faltam ${goal.remaining} ${periodWord}, até ${dateShort(goal.periodEnd)}.`}
+      </p>
+      <p className="mt-0.5 text-[11.5px] text-ink-faint">
+        {goal.period === "week" ? "Semana passada" : "Mês passado"}: {goal.previousDone} de{" "}
+        {goal.targetQty}
       </p>
     </div>
   );
