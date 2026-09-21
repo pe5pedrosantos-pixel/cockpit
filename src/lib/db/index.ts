@@ -1,45 +1,42 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { attachDatabasePool } from "@vercel/functions";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
 /**
- * O pooler do Supabase tem dois modos na mesma máquina:
- * - 6543, "transaction": cada consulta pode cair numa conexão diferente.
- *   Com várias telas carregando ao mesmo tempo, o postgres.js enfileira
- *   consultas na mesma conexão (pipelining) e o pooler se perde — a
- *   instância inteira trava até o limite de tempo.
- * - 5432, "session": a conexão é nossa enquanto estiver aberta. Aguenta o
- *   pipelining sem problema.
- * Usamos o modo sessão a partir da mesma DATABASE_URL, sem mexer na Vercel.
- * DB_POOL_MODE=transaction volta ao comportamento antigo, se precisar.
+ * Conexão com o Supabase pelo pooler em modo transação (porta 6543).
+ *
+ * Na Vercel as instâncias ficam congeladas entre um acesso e outro. Uma
+ * conexão aberta nesse intervalo pode morrer do lado do Supabase sem a
+ * instância saber — e a próxima tela fica esperando para sempre. Por isso:
+ * - attachDatabasePool avisa a Vercel para fechar as conexões ociosas
+ *   antes de congelar a instância;
+ * - toda consulta tem prazo (query_timeout): se algo travar, a tela
+ *   mostra erro em segundos em vez de ficar carregando;
+ * - o driver pg não faz pipelining, que o pooler em modo transação não
+ *   suporta bem.
  */
-const rawUrl = process.env.DATABASE_URL!;
-const useSession =
-  process.env.DB_POOL_MODE !== "transaction" &&
-  rawUrl.includes("pooler.supabase.com:6543");
-const url = useSession
-  ? rawUrl.replace("pooler.supabase.com:6543", "pooler.supabase.com:5432")
-  : rawUrl;
+const globalForDb = globalThis as unknown as { pool: Pool | undefined };
 
-const globalForDb = globalThis as unknown as {
-  conn: postgres.Sql | undefined;
-};
-
-const conn =
-  globalForDb.conn ??
-  postgres(url, {
-    // No modo sessão o plano grátis aceita 15 clientes no total. Uma
-    // conexão por instância basta: as consultas simultâneas seguem em
-    // pipeline nela, e várias instâncias não esgotam o limite.
-    max: useSession ? 1 : 3,
-    idle_timeout: useSession ? 10 : 20,
-    connect_timeout: 10,
-    // conexões não vivem para sempre: evita herdar uma conexão ruim
-    max_lifetime: 60 * 5,
-    prepare: false,
+const pool =
+  globalForDb.pool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,
+    idleTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 20_000,
+    // o Supabase exige TLS; o certificado do pooler não fecha a cadeia no Node
+    ssl: process.env.DATABASE_URL?.includes("supabase.com")
+      ? { rejectUnauthorized: false }
+      : undefined,
   });
 
-// reaproveita a conexão entre invocações (evita handshake a cada request)
-globalForDb.conn = conn;
+if (!globalForDb.pool) {
+  globalForDb.pool = pool;
+  // conexão que cai não derruba o processo
+  pool.on("error", (err) => console.error("[db] conexão perdida:", err.message));
+  attachDatabasePool(pool);
+}
 
-export const db = drizzle(conn, { schema });
+export const db = drizzle(pool, { schema });
