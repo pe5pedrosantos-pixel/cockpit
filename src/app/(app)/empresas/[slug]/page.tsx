@@ -267,6 +267,9 @@ export default async function CompanyPage({
                 <p className="text-[13.5px] font-medium">{monthLabel(h.monthRef)}</p>
                 <p className="text-[11.5px] tabular-nums text-ink-muted">
                   {h.totalDelivered} de {h.totalPlanned}
+                  {h.extra > 0 && (
+                    <span className="text-money">, +{h.extra} extra</span>
+                  )}
                 </p>
               </div>
               <Progress value={h.percent} color={company.color} className="flex-1" />

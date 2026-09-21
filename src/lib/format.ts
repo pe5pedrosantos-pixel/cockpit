@@ -73,7 +73,8 @@ export function num(value: number, decimals = 1): string {
 
 export function pct(delivered: number, planned: number): number {
   if (planned <= 0) return 0;
-  return Math.round((delivered / planned) * 1000) / 10;
+  // inteiro: evita "87.5%" (ponto decimal) e é o que importa na leitura
+  return Math.round((delivered / planned) * 100);
 }
 
 /** Lista de monthRefs em volta do mês atual (para seletores). */

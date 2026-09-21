@@ -14,6 +14,8 @@ export interface CompanyMonthSummary {
   monthRef: string;
   totalPlanned: number;
   totalDelivered: number;
+  /** peças entregues além do planejado (não contam no %) */
+  extra: number;
   percent: number;
   remaining: number;
   daysLeft: number;
@@ -47,6 +49,10 @@ export function summarizeCompanyMonth(
     (s, d) => s + Math.min(d.deliveredQty, d.plannedQty),
     0
   );
+  const extra = items.reduce(
+    (s, d) => s + Math.max(d.deliveredQty - d.plannedQty, 0),
+    0
+  );
   const remaining = Math.max(totalPlanned - totalDelivered, 0);
   const percent = pct(totalDelivered, totalPlanned);
   const daysLeft = daysLeftInMonth(monthRef);
@@ -73,6 +79,7 @@ export function summarizeCompanyMonth(
     monthRef,
     totalPlanned,
     totalDelivered,
+    extra,
     percent,
     remaining,
     daysLeft,
