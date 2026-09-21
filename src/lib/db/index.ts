@@ -13,12 +13,13 @@ import * as schema from "./schema";
  * Usamos o modo sessão a partir da mesma DATABASE_URL, sem mexer na Vercel.
  * DB_POOL_MODE=transaction volta ao comportamento antigo, se precisar.
  */
-function connectionUrl(raw: string): string {
-  if (process.env.DB_POOL_MODE === "transaction") return raw;
-  return raw.includes("pooler.supabase.com:6543")
-    ? raw.replace("pooler.supabase.com:6543", "pooler.supabase.com:5432")
-    : raw;
-}
+const rawUrl = process.env.DATABASE_URL!;
+const useSession =
+  process.env.DB_POOL_MODE !== "transaction" &&
+  rawUrl.includes("pooler.supabase.com:6543");
+const url = useSession
+  ? rawUrl.replace("pooler.supabase.com:6543", "pooler.supabase.com:5432")
+  : rawUrl;
 
 const globalForDb = globalThis as unknown as {
   conn: postgres.Sql | undefined;
@@ -26,9 +27,12 @@ const globalForDb = globalThis as unknown as {
 
 const conn =
   globalForDb.conn ??
-  postgres(connectionUrl(process.env.DATABASE_URL!), {
-    max: 3,
-    idle_timeout: 20,
+  postgres(url, {
+    // No modo sessão o plano grátis aceita 15 clientes no total. Uma
+    // conexão por instância basta: as consultas simultâneas seguem em
+    // pipeline nela, e várias instâncias não esgotam o limite.
+    max: useSession ? 1 : 3,
+    idle_timeout: useSession ? 10 : 20,
     connect_timeout: 10,
     // conexões não vivem para sempre: evita herdar uma conexão ruim
     max_lifetime: 60 * 5,
