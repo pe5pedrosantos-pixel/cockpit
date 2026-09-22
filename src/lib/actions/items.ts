@@ -89,7 +89,9 @@ const addSchema = z.object({
   companyId: z.coerce.number().int().positive(),
   deliverableId: z.coerce.number().int().positive().nullable().optional(),
   monthRef: z.string().regex(/^\d{4}-\d{2}$/),
-  url: z.string().min(4),
+  url: z.string().optional().nullable(),
+  /** obrigatório quando não há link */
+  platform: z.string().optional().nullable(),
   format: z.string().max(30).nullable().optional(),
   publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   title: z.string().max(200).nullable().optional(),
@@ -105,18 +107,25 @@ export async function addItem(formData: FormData): Promise<{ ok: boolean; messag
     publishedAt: raw.publishedAt || null,
     title: raw.title || null,
   });
-  if (!parsed.success) return { ok: false, message: "Confira o link e o mês." };
+  if (!parsed.success) return { ok: false, message: "Confira os dados da publicação." };
 
-  const link = detectLink(parsed.data.url);
-  if (!link.valid) return { ok: false, message: "Esse endereço não parece um link válido." };
+  // com link, a rede e o formato saem dele; sem link, a rede vem do formulário
+  const link = parsed.data.url ? detectLink(parsed.data.url) : null;
+  if (link && !link.valid) {
+    return { ok: false, message: "Esse endereço não parece um link válido." };
+  }
+  const platform = link?.platform ?? parsed.data.platform ?? null;
+  if (!platform || !(platform in PLATFORMS)) {
+    return { ok: false, message: "Escolha a rede da publicação." };
+  }
 
   await db.insert(deliverableItems).values({
     companyId: parsed.data.companyId,
     deliverableId: parsed.data.deliverableId ?? null,
     monthRef: parsed.data.monthRef,
-    url: link.url,
-    platform: link.platform,
-    format: parsed.data.format ?? link.format,
+    url: link?.url ?? null,
+    platform,
+    format: parsed.data.format ?? link?.format ?? null,
     title: parsed.data.title ?? null,
     publishedAt: parsed.data.publishedAt ?? defaultDate(parsed.data.monthRef),
   });
@@ -124,7 +133,7 @@ export async function addItem(formData: FormData): Promise<{ ok: boolean; messag
     await recountDeliverable(parsed.data.deliverableId, "new");
 
   revalidateAll();
-  return { ok: true, message: `Link do ${platformLabel(link.platform)} registrado.` };
+  return { ok: true, message: `Publicação no ${platformLabel(platform)} registrada.` };
 }
 
 // ─── Vários links de uma vez ──────────────────────────────────────────────
@@ -276,7 +285,7 @@ export async function deleteItem(id: number) {
 
 const editSchema = z.object({
   title: z.string().trim().max(300).optional().nullable(),
-  url: z.string().trim().url("Link inválido"),
+  url: z.string().trim().url("Link inválido").optional().nullable().or(z.literal("")),
   platform: z.enum(Object.keys(PLATFORMS) as [string, ...string[]]),
   format: z.string().optional().nullable(),
   publishedAt: z
@@ -296,6 +305,7 @@ export async function updateItem(
   const parsed = editSchema.safeParse({
     ...raw,
     title: raw.title || null,
+    url: raw.url || null,
     format: raw.format || null,
     publishedAt: raw.publishedAt || null,
   });
@@ -310,7 +320,7 @@ export async function updateItem(
     .update(deliverableItems)
     .set({
       title: d.title ?? null,
-      url: d.url,
+      url: d.url || null,
       platform: d.platform,
       format: d.format ?? null,
       publishedAt: d.publishedAt ?? null,

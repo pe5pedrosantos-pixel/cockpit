@@ -29,6 +29,13 @@
       "when": 1789994914234,
       "tag": "0003_delivery_links_goals_crm",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790108581614,
+      "tag": "0004_item_url_opcional",
+      "breakpoints": true
     }
   ]
 }

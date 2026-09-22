@@ -1,0 +1,1 @@
+ALTER TABLE "deliverable_items" ALTER COLUMN "url" DROP NOT NULL;

@@ -12,7 +12,7 @@ import { FORMATS, PLATFORMS, formatLabel, platformLabel } from "@/lib/platforms"
 
 export interface PublishedItem {
   id: number;
-  url: string;
+  url: string | null;
   platform: string;
   format: string | null;
   title: string | null;
@@ -79,15 +79,24 @@ function Row({ item }: { item: PublishedItem }) {
       <span className="w-[4.5rem] shrink-0 text-[12px] font-medium text-ink">
         {platformLabel(item.platform)}
       </span>
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-ink-muted hover:text-coral"
-      >
-        <span className="truncate">{item.title ?? item.url.replace(/^https?:\/\/(www\.)?/, "")}</span>
-        <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
-      </a>
+      {item.url ? (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-ink-muted hover:text-coral"
+        >
+          <span className="truncate">
+            {item.title ?? item.url.replace(/^https?:\/\/(www\.)?/, "")}
+          </span>
+          <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+        </a>
+      ) : (
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-ink-muted">
+          <span className="truncate">{item.title ?? "Publicação sem link"}</span>
+          <span className="shrink-0 text-[11px] text-ink-faint">sem link</span>
+        </span>
+      )}
       {fmt && <span className="hidden shrink-0 text-[11.5px] text-ink-faint sm:inline">{fmt}</span>}
       {item.publishedAt && (
         <span className="shrink-0 text-[11.5px] tabular-nums text-ink-faint">
@@ -147,8 +156,8 @@ function EditItemDialog({ item }: { item: PublishedItem }) {
             <Input id={`it-title-${item.id}`} name="title" defaultValue={item.title ?? ""} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`it-url-${item.id}`}>Link</Label>
-            <Input id={`it-url-${item.id}`} name="url" type="url" required defaultValue={item.url} />
+            <Label htmlFor={`it-url-${item.id}`}>Link (opcional)</Label>
+            <Input id={`it-url-${item.id}`} name="url" type="url" defaultValue={item.url ?? ""} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">

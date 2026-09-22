@@ -9,6 +9,7 @@ import { DeliverablesKanban } from "@/components/deliverables-kanban";
 import { EntregasFilters } from "@/components/filters";
 import { GoalsPanel } from "@/components/goals-panel";
 import { LinkImportDialog } from "@/components/link-import";
+import { PublicationFormDialog } from "@/components/publication-form";
 import { PublishedList } from "@/components/published-list";
 import { TaskFormDialog } from "@/components/task-form";
 import { TaskItem } from "@/components/task-item";
@@ -128,6 +129,11 @@ export default async function CompanyPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <PublicationFormDialog
+            companyId={company.id}
+            companyName={company.name}
+            defaultMonth={monthRef}
+          />
           <LinkImportDialog
             companyId={company.id}
             companyName={company.name}

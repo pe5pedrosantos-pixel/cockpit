@@ -98,7 +98,8 @@ export const deliverableItems = pgTable("deliverable_items", {
     onDelete: "set null",
   }),
   monthRef: text("month_ref").notNull(),
-  url: text("url").notNull(),
+  /** link da publicação; pode faltar (post registrado sem link) */
+  url: text("url"),
   platform: text("platform").notNull(), // instagram | linkedin | youtube | tiktok | facebook | x | outro
   format: text("format"), // estatico | carrossel | video | reels | vlog | artigo | outro
   title: text("title"),
