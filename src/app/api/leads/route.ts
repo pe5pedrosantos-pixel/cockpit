@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Webhook-Secret, apikey",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -35,7 +35,7 @@ const str = (max: number) =>
 
 const schema = z
   .object({
-    name: z.string().trim().min(2, "Informe seu nome").max(120),
+    name: z.string({ error: "Informe seu nome" }).trim().min(2, "Informe seu nome").max(120),
     email: str(160).refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "E-mail inválido"),
     phone: str(40),
     company: str(160),
@@ -63,34 +63,79 @@ export async function OPTIONS() {
 
 async function readBody(req: NextRequest): Promise<Record<string, unknown>> {
   const type = req.headers.get("content-type") ?? "";
-  if (type.includes("application/json")) {
-    return (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (type.includes("multipart/form-data") || type.includes("application/x-www-form-urlencoded")) {
+    const form = await req.formData().catch(() => null);
+    return form ? Object.fromEntries(form.entries()) : {};
   }
-  const form = await req.formData().catch(() => null);
-  return form ? Object.fromEntries(form.entries()) : {};
+  // JSON, inclusive quando vem sem content-type ou como text/plain
+  const text = await req.text().catch(() => "");
+  if (!text) return {};
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return Object.fromEntries(new URLSearchParams(text).entries());
+  }
 }
 
-/** Aceita nomes de campo comuns em português também. */
-function normalizeKeys(raw: Record<string, unknown>) {
-  const pick = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = raw[k];
-      if (typeof v === "string" && v.trim()) return v;
+/** "Nome Completo", "full_name", "fullName" → "nomecompleto", "fullname". */
+const keyOf = (k: string) =>
+  k
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+/**
+ * Achata o corpo: aceita os campos na raiz ou dentro de data/lead/fields/
+ * payload/record/body/formData/values/contact (formatos comuns de webhook).
+ */
+function flatten(raw: Record<string, unknown>, out: Record<string, string> = {}, depth = 0) {
+  for (const [k, v] of Object.entries(raw)) {
+    if (v == null) continue;
+    if (typeof v === "object" && !Array.isArray(v) && depth < 3) {
+      flatten(v as Record<string, unknown>, out, depth + 1);
+    } else if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      const key = keyOf(k);
+      const val = String(v).trim();
+      if (val && !(key in out)) out[key] = val;
+    } else if (Array.isArray(v) && v.every((x) => typeof x === "string")) {
+      const key = keyOf(k);
+      if (v.length && !(key in out)) out[key] = v.join(", ");
     }
+  }
+  return out;
+}
+
+/** Aceita nomes de campo comuns em português e inglês, em qualquer grafia. */
+function normalizeKeys(raw: Record<string, unknown>) {
+  const f = flatten(raw);
+  const pick = (...keys: string[]) => {
+    for (const k of keys) if (f[k]) return f[k];
     return null;
   };
+  const first = pick("firstname", "primeironome");
+  const last = pick("lastname", "sobrenome");
   return {
-    name: pick("name", "nome"),
-    email: pick("email", "e-mail"),
-    phone: pick("phone", "telefone", "whatsapp", "celular"),
-    company: pick("company", "empresa", "organization", "organizacao"),
-    role: pick("role", "cargo"),
-    interest: pick("interest", "interesse", "servico", "tipo"),
-    message: pick("message", "mensagem", "descricao"),
-    utm_source: pick("utm_source"),
-    utm_campaign: pick("utm_campaign"),
-    page_url: pick("page_url", "pagina"),
-    website: pick("website", "_gotcha"),
+    name:
+      pick("name", "nome", "fullname", "nomecompleto", "seunome", "yourname", "contactname", "nomecontato") ??
+      ([first, last].filter(Boolean).join(" ") || null),
+    email: pick("email", "mail", "emailaddress", "seuemail", "enderecoemail", "emailcorporativo"),
+    phone: pick(
+      "phone", "telefone", "whatsapp", "celular", "tel", "telephone", "mobile", "phonenumber",
+      "numerowhatsapp", "whatsappnumber", "fone"
+    ),
+    company: pick("company", "empresa", "organization", "organizacao", "companyname", "nomeempresa", "instituicao"),
+    role: pick("role", "cargo", "jobtitle", "position", "funcao"),
+    interest: pick(
+      "interest", "interesse", "servico", "service", "tipo", "type", "assunto", "subject",
+      "tipoevento", "eventtype", "solucao", "produto"
+    ),
+    message: pick("message", "mensagem", "descricao", "description", "msg", "comments", "comentarios", "detalhes", "details", "observacoes"),
+    utm_source: pick("utmsource"),
+    utm_campaign: pick("utmcampaign"),
+    page_url: pick("pageurl", "pagina", "url", "page", "origem", "source", "landingpage", "referrer"),
+    website: pick("website", "gotcha", "honeypot"),
   };
 }
 
@@ -104,9 +149,16 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  const parsed = schema.safeParse(normalizeKeys(await readBody(req)));
+  const raw = await readBody(req);
+  const fields = normalizeKeys(raw);
+  // e-mail mal digitado não derruba o lead se houver telefone
+  if (fields.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fields.email) && fields.phone) fields.email = null;
+  const parsed = schema.safeParse(fields);
   if (!parsed.success) {
-    return json({ ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" }, 400);
+    const error = parsed.error.issues[0]?.message ?? "Dados inválidos";
+    // só os nomes dos campos, nunca os valores, para diagnosticar integrações
+    console.warn("[leads] envio recusado:", error, "| campos recebidos:", Object.keys(flatten(raw)).join(", ") || "(nenhum)", "| content-type:", req.headers.get("content-type"));
+    return json({ ok: false, error }, 400);
   }
   const d = parsed.data;
 
