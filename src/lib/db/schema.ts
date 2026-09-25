@@ -215,6 +215,48 @@ export const pdPersons = pgTable("pd_persons", {
   syncedAt: timestamp("synced_at"),
 });
 
+// ─── Funil próprio (Pedro Santos: palestras e consultorias) ────────────────
+// Não passa pelo Pipedrive da SOBE: é o CRM pessoal, alimentado pelo site.
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  organization: text("organization"),
+  role: text("role"),
+  /** palestra | consultoria | mentoria | outro */
+  interest: text("interest"),
+  message: text("message"),
+  /** novo | contato | briefing | proposta | negociacao | fechado | perdido */
+  stage: text("stage").notNull().default("novo"),
+  value: numeric("value", { precision: 14, scale: 2 }),
+  /** data do evento/palestra, quando houver */
+  eventDate: date("event_date"),
+  nextStep: text("next_step"),
+  nextStepDate: date("next_step_date"),
+  lostReason: text("lost_reason"),
+  /** site | manual | indicacao | linkedin | instagram | evento */
+  source: text("source").notNull().default("manual"),
+  utmSource: text("utm_source"),
+  utmCampaign: text("utm_campaign"),
+  pageUrl: text("page_url"),
+  /** já foi aberto no cockpit? (lead novo do site fica destacado até ser visto) */
+  seen: boolean("seen").notNull().default(false),
+  stageChangedAt: timestamp("stage_changed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const leadNotes = pgTable("lead_notes", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id")
+    .notNull()
+    .references(() => leads.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
   provider: text("provider").notNull().unique(), // "pipedrive"
@@ -286,6 +328,14 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   }),
 }));
 
+export const leadsRelations = relations(leads, ({ many }) => ({
+  notes: many(leadNotes),
+}));
+
+export const leadNotesRelations = relations(leadNotes, ({ one }) => ({
+  lead: one(leads, { fields: [leadNotes.leadId], references: [leads.id] }),
+}));
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type Company = typeof companies.$inferSelect;
@@ -301,3 +351,5 @@ export type PdPerson = typeof pdPersons.$inferSelect;
 export type DeliverableStatus = Deliverable["status"];
 export type TaskStatus = Task["status"];
 export type TaskPriority = Task["priority"];
+export type Lead = typeof leads.$inferSelect;
+export type LeadNote = typeof leadNotes.$inferSelect;

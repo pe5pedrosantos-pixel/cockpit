@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Mic,
   Package,
   Plug,
   TrendingUp,
@@ -81,6 +82,7 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
       {section("Comercial")}
       {item("/funil", "Funil da SOBE", <TrendingUp className="h-4 w-4" />)}
       {item("/clientes", "Clientes", <Users className="h-4 w-4" />)}
+      {item("/leads", "Funil Pedro Santos", <Mic className="h-4 w-4" />)}
 
       {section("Entregas")}
       {companies.map((c) => {

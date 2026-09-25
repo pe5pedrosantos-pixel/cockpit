@@ -13,7 +13,9 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/api/health") ||
     // protegida pelo CRON_SECRET, não pela sessão
-    pathname.startsWith("/api/cron")
+    pathname.startsWith("/api/cron") ||
+    // formulário do site de Pedro Santos (entrada pública de leads)
+    pathname.startsWith("/api/leads")
   ) {
     return NextResponse.next();
   }

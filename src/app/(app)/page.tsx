@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { integrations, pipelineDeals } from "@/lib/db/schema";
+import { integrations, leads, pipelineDeals } from "@/lib/db/schema";
+import { LEAD_INTERESTS } from "@/lib/leads";
 import { Card, CardContent, CardHeader, CardTitle, Stat } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DayHeadline } from "@/components/day-headline";
@@ -69,6 +70,7 @@ export default async function DashboardPage() {
     goals,
     recentItems,
     crmActivities,
+    newLeads,
   ] = await Promise.all([
     getMonthSummaries(monthRef),
     getTodayTasks(),
@@ -80,6 +82,12 @@ export default async function DashboardPage() {
     getActiveGoals(),
     getRecentItems(),
     getDueActivities(),
+    db
+      .select()
+      .from(leads)
+      .where(eq(leads.seen, false))
+      .orderBy(desc(leads.createdAt))
+      .limit(8),
   ]);
 
   const overdueActivities = openDeals.filter(
@@ -103,6 +111,16 @@ export default async function DashboardPage() {
           r.g.period === "week" ? "esta semana" : "este mês"
         }, faltam ${r.p.daysLeft} ${r.p.daysLeft === 1 ? "dia" : "dias"}.`,
       })),
+    ...(newLeads.length > 0
+      ? [
+          {
+            level: "warning" as const,
+            message: `${newLeads.length} ${
+              newLeads.length === 1 ? "lead novo do site esperando" : "leads novos do site esperando"
+            } retorno no funil Pedro Santos.`,
+          },
+        ]
+      : []),
   ].sort((a, b) => (a.level === b.level ? 0 : a.level === "critical" ? -1 : 1));
   const companyOptions = companies.map((c) => ({ id: c.id, name: c.name }));
   const pipelineTotal = openDeals.reduce((s, d) => s + parseFloat(d.value ?? "0"), 0);
@@ -123,6 +141,41 @@ export default async function DashboardPage() {
           auto
         />
       </div>
+
+      {/* Leads novos do site (funil Pedro Santos) */}
+      {newLeads.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-[15px] font-semibold tracking-tight">
+              Leads novos do site
+            </h2>
+            <Link
+              href="/leads"
+              className="text-[12.5px] text-ink-muted underline-offset-2 hover:text-coral hover:underline"
+            >
+              Abrir funil Pedro Santos
+            </Link>
+          </div>
+          <div className="flex flex-col gap-2">
+            {newLeads.map((l) => (
+              <Link
+                key={l.id}
+                href="/leads"
+                className="flex items-center gap-3 rounded-lg border border-coral/30 bg-attention-bg px-3 py-2.5 hover:border-coral"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-coral" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {l.name}
+                  {l.organization && <span className="font-normal text-ink-muted">, {l.organization}</span>}
+                </span>
+                <span className="shrink-0 text-[11.5px] text-ink-muted">
+                  {l.interest ? (LEAD_INTERESTS[l.interest] ?? l.interest) : "Contato"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Comercial */}
       <section className="flex flex-col gap-3">
