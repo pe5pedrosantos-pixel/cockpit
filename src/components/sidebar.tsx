@@ -15,6 +15,7 @@ import {
   Plug,
   TrendingUp,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,9 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
         );
       })}
       {item("/entregas", "Todas as entregas", <Package className="h-4 w-4" />)}
+
+      {section("Financeiro")}
+      {item("/erp", "ERP", <Wallet className="h-4 w-4" />)}
 
       {section("Organização")}
       {item("/tarefas", "Tarefas", <CheckSquare className="h-4 w-4" />)}

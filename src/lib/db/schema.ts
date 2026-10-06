@@ -336,6 +336,30 @@ export const leadNotesRelations = relations(leadNotes, ({ one }) => ({
   lead: one(leads, { fields: [leadNotes.leadId], references: [leads.id] }),
 }));
 
+/**
+ * ERP pessoal: entradas (e, depois, saídas) de dinheiro na PJ e na PF.
+ * Cada linha é um valor esperado num mês, com o controle da nota fiscal
+ * e do recebimento.
+ */
+export const financeEntries = pgTable("finance_entries", {
+  id: serial("id").primaryKey(),
+  direction: text("direction").notNull().default("entrada"), // entrada | saida
+  entity: text("entity").notNull().default("pj"), // pj | pf
+  payer: text("payer").notNull(), // quem paga (Sobe, Orka Eng, ...)
+  kind: text("kind").notNull().default("salario"), // salario | comissao | luvas | outro
+  description: text("description"),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  monthRef: text("month_ref").notNull(),
+  nfStatus: text("nf_status").notNull().default("pendente"), // pendente | emitida | nao_aplica
+  nfNumber: text("nf_number"),
+  nfIssuedAt: date("nf_issued_at"),
+  received: boolean("received").notNull().default(false),
+  receivedAt: date("received_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type Company = typeof companies.$inferSelect;
@@ -353,3 +377,4 @@ export type TaskStatus = Task["status"];
 export type TaskPriority = Task["priority"];
 export type Lead = typeof leads.$inferSelect;
 export type LeadNote = typeof leadNotes.$inferSelect;
+export type FinanceEntry = typeof financeEntries.$inferSelect;

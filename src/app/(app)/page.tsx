@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { integrations, leads, pipelineDeals } from "@/lib/db/schema";
+import { financeEntries, integrations, leads, pipelineDeals } from "@/lib/db/schema";
 import { LEAD_INTERESTS } from "@/lib/leads";
 import { Card, CardContent, CardHeader, CardTitle, Stat } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -71,6 +71,7 @@ export default async function DashboardPage() {
     recentItems,
     crmActivities,
     newLeads,
+    nfPending,
   ] = await Promise.all([
     getMonthSummaries(monthRef),
     getTodayTasks(),
@@ -88,6 +89,15 @@ export default async function DashboardPage() {
       .where(eq(leads.seen, false))
       .orderBy(desc(leads.createdAt))
       .limit(8),
+    db
+      .select({ payer: financeEntries.payer, monthRef: financeEntries.monthRef })
+      .from(financeEntries)
+      .where(
+        and(
+          eq(financeEntries.nfStatus, "pendente"),
+          lte(financeEntries.monthRef, monthRef)
+        )
+      ),
   ]);
 
   const overdueActivities = openDeals.filter(
@@ -118,6 +128,16 @@ export default async function DashboardPage() {
             message: `${newLeads.length} ${
               newLeads.length === 1 ? "lead novo do site esperando" : "leads novos do site esperando"
             } retorno no funil Pedro Santos.`,
+          },
+        ]
+      : []),
+    ...(nfPending.length > 0
+      ? [
+          {
+            level: "warning" as const,
+            message: `${nfPending.length} ${
+              nfPending.length === 1 ? "nota fiscal a emitir" : "notas fiscais a emitir"
+            } no ERP: ${[...new Set(nfPending.map((n) => n.payer))].join(", ")}.`,
           },
         ]
       : []),
