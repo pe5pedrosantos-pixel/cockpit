@@ -4,9 +4,16 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
 import { financeEntries } from "@/lib/db/schema";
 import { Stat } from "@/components/ui/card";
-import { EntriesTable, EntryDialog, type EntryData } from "@/components/erp";
+import {
+  BalanceCalculator,
+  CopyOutflowsButton,
+  EntriesTable,
+  EntryDialog,
+  OutflowsTable,
+  type EntryData,
+} from "@/components/erp";
 import { brl, currentMonthRef, monthLabel } from "@/lib/format";
-import { addMonths, DEFAULT_PAYERS, money, monthShort, payerColor } from "@/lib/finance";
+import { addMonths, DEFAULT_PAYERS, type Direction, money, monthBalances, monthShort, payerColor } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -23,11 +30,11 @@ export default async function ErpPage({
   const rows = await db
     .select()
     .from(financeEntries)
-    .where(eq(financeEntries.direction, "entrada"))
     .orderBy(asc(financeEntries.monthRef), asc(financeEntries.payer), asc(financeEntries.id));
 
-  const entries: EntryData[] = rows.map((r) => ({
+  const all: EntryData[] = rows.map((r) => ({
     id: r.id,
+    direction: (r.direction === "saida" ? "saida" : "entrada") as Direction,
     entity: r.entity,
     payer: r.payer,
     kind: r.kind,
@@ -42,6 +49,9 @@ export default async function ErpPage({
     notes: r.notes,
   }));
 
+  const entries = all.filter((e) => e.direction === "entrada");
+  const outflows = all.filter((e) => e.direction === "saida");
+
   // pagadores: os de sempre primeiro, depois os que forem aparecendo
   const payers = [...DEFAULT_PAYERS];
   for (const e of entries) if (!payers.includes(e.payer)) payers.push(e.payer);
@@ -55,6 +65,17 @@ export default async function ErpPage({
   const toReceive = expected - received;
   const nfPending = ofMonth.filter((e) => e.nfStatus === "pendente").length;
   const nfDue = month <= current;
+
+  // saídas: contas conhecidas viram opções no formulário
+  const billNames: string[] = [];
+  for (const e of outflows) if (!billNames.includes(e.payer)) billNames.push(e.payer);
+  const outOfMonth = outflows
+    .filter((e) => e.monthRef === month)
+    .sort((a, b) => (a.entity === b.entity ? a.id - b.id : a.entity === "pj" ? -1 : 1));
+  const outPj = outOfMonth.filter((e) => e.entity === "pj").reduce((s, e) => s + e.amount, 0);
+  const outPf = outOfMonth.filter((e) => e.entity !== "pj").reduce((s, e) => s + e.amount, 0);
+  const left = expected - outPj - outPf;
+  const prevHasOut = outflows.some((e) => e.monthRef === addMonths(month, -1));
 
   // NFs atrasadas de meses anteriores também pedem atenção
   const nfLate = entries.filter((e) => e.nfStatus === "pendente" && e.monthRef < current);
@@ -72,17 +93,28 @@ export default async function ErpPage({
   const prev = addMonths(month, -1);
   const next = addMonths(month, 1);
 
+  // calculadora: do mês atual até o último mês com lançamento (mínimo 6)
+  const lastMonth = all.reduce((m, e) => (e.monthRef > m ? e.monthRef : m), current);
+  const calcMonths: string[] = [];
+  for (let m = current; m <= lastMonth || calcMonths.length < 6; m = addMonths(m, 1)) {
+    calcMonths.push(m);
+    if (calcMonths.length >= 12) break;
+  }
+  const balances = monthBalances(all, calcMonths);
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-[24px] font-extrabold tracking-[-0.025em]">ERP</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Entradas de dinheiro na PJ e na PF, com o controle das notas fiscais. As saídas
-            entram na próxima etapa.
+            Entradas e contas fixas da PJ e da PF, e quanto sobra em cada mês.
           </p>
         </div>
-        <EntryDialog payers={payers} defaultMonth={month} />
+        <div className="flex items-center gap-2">
+          <EntryDialog direction="saida" names={billNames} defaultMonth={month} />
+          <EntryDialog direction="entrada" names={payers} defaultMonth={month} />
+        </div>
       </header>
 
       <div className="flex items-center gap-1">
@@ -117,13 +149,13 @@ export default async function ErpPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Previsto no mês" value={brl(expected)} />
-        <Stat label="Recebido" value={brl(received)} tone={received > 0 ? "money" : "default"} />
-        <Stat label="A receber" value={brl(toReceive)} />
+        <Stat label="Entradas do mês" value={brl(expected)} note={received > 0 ? `${brl(received)} já recebido` : undefined} />
+        <Stat label="Contas PJ" value={brl(outPj)} />
+        <Stat label="Contas PF" value={brl(outPf)} />
         <Stat
-          label={nfPending === 1 ? "Nota fiscal a emitir" : "Notas fiscais a emitir"}
-          value={nfPending}
-          tone={nfPending > 0 && nfDue ? "attention" : "default"}
+          label={left < 0 ? "Falta no mês" : "Sobra no mês"}
+          value={brl(Math.abs(left))}
+          tone={left < 0 ? "attention" : outOfMonth.length > 0 && left > 0 ? "money" : "default"}
         />
       </div>
 
@@ -139,27 +171,67 @@ export default async function ErpPage({
       )}
 
       <section className="flex flex-col gap-2.5">
-        <h3 className="font-display text-[15px] font-semibold text-ink">Entradas do mês</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-[15px] font-semibold text-ink">Entradas</h3>
+          <p className="text-[12.5px] text-ink-muted">
+            {toReceive > 0 ? `${brl(toReceive)} a receber` : "Tudo recebido"}
+            {nfPending > 0 &&
+              `, ${nfPending} ${nfPending === 1 ? "nota fiscal a emitir" : "notas fiscais a emitir"}`}
+          </p>
+        </div>
         {ofMonth.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-paper p-6 text-center text-[13.5px] text-ink-muted">
             Nada lançado em {monthLabel(month).toLowerCase()}. Use &ldquo;Nova entrada&rdquo;;
             dá para repetir um salário fixo por vários meses de uma vez.
           </div>
         ) : (
-          <EntriesTable entries={ofMonth} payers={payers} nfDue={nfDue} />
+          <EntriesTable entries={ofMonth} names={payers} nfDue={nfDue} />
         )}
+      </section>
+
+      <section className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-display text-[15px] font-semibold text-ink">Contas fixas</h3>
+            <p className="text-[12.5px] text-ink-muted">
+              Clique no valor para trocar: cartão de crédito, conta que veio diferente.
+            </p>
+          </div>
+          {prevHasOut && <CopyOutflowsButton from={prev} to={month} />}
+        </div>
+        {outOfMonth.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-paper p-6 text-center text-[13.5px] text-ink-muted">
+            Nenhuma conta em {monthLabel(month).toLowerCase()}.{" "}
+            {prevHasOut
+              ? "Copie as contas do mês anterior e ajuste os cartões."
+              : "Use “Nova saída” para lançar."}
+          </div>
+        ) : (
+          <OutflowsTable entries={outOfMonth} names={billNames} />
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2.5">
+        <div>
+          <h3 className="font-display text-[15px] font-semibold text-ink">Quanto sobra, mês a mês</h3>
+          <p className="text-[12.5px] text-ink-muted">
+            Entradas menos as contas da PJ e da PF. Meses sem contas lançadas ainda não mostram o
+            gasto real.
+          </p>
+        </div>
+        <BalanceCalculator balances={balances} selected={month} />
       </section>
 
       {matrixPayers.length > 0 && (
         <section className="flex flex-col gap-2.5">
           <div>
-            <h3 className="font-display text-[15px] font-semibold text-ink">Próximos 6 meses</h3>
+            <h3 className="font-display text-[15px] font-semibold text-ink">Entradas nos próximos 6 meses</h3>
             <p className="text-[12.5px] text-ink-muted">
               O ponto mostra a nota fiscal: preenchido é emitida, vazado é a emitir.
             </p>
           </div>
           <div className="overflow-x-auto rounded-lg border border-border bg-paper">
-            <table className="w-full min-w-[640px] text-[13px]">
+            <table className="w-full min-w-[640px] whitespace-nowrap text-[13px]">
               <thead>
                 <tr className="border-b border-border text-ink-muted">
                   <th className="px-4 py-2 text-left font-medium">Quem paga</th>

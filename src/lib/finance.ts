@@ -1,5 +1,5 @@
 /**
- * Vocabulário do ERP pessoal (entradas e, depois, saídas de dinheiro).
+ * Vocabulário do ERP pessoal: entradas e saídas de dinheiro, PJ e PF.
  * Compartilhado entre a página, as ações e o dashboard.
  */
 
@@ -7,6 +7,15 @@ export const FINANCE_KINDS: Record<string, string> = {
   salario: "Salário",
   comissao: "Comissão",
   luvas: "Luvas",
+  outro: "Outro",
+};
+
+/** Tipos de saída (só contas fixas; os cartões entram mês a mês). */
+export const OUT_KINDS: Record<string, string> = {
+  fixo: "Conta fixa",
+  cartao: "Cartão de crédito",
+  parcela: "Parcela",
+  tributo: "Tributo",
   outro: "Outro",
 };
 
@@ -37,7 +46,35 @@ export function payerColor(payer: string): string {
 }
 
 export function kindLabel(k: string): string {
-  return FINANCE_KINDS[k] ?? k;
+  return FINANCE_KINDS[k] ?? OUT_KINDS[k] ?? k;
+}
+
+export type Direction = "entrada" | "saida";
+
+/** Saldo de cada mês: entradas menos saídas da PJ e da PF. */
+export interface MonthBalance {
+  monthRef: string;
+  income: number;
+  outPj: number;
+  outPf: number;
+  left: number;
+}
+
+export function monthBalances(
+  rows: { direction: string; entity: string; amount: number; monthRef: string }[],
+  months: string[]
+): MonthBalance[] {
+  return months.map((m) => {
+    const of = rows.filter((r) => r.monthRef === m);
+    const income = of.filter((r) => r.direction === "entrada").reduce((s, r) => s + r.amount, 0);
+    const outPj = of
+      .filter((r) => r.direction === "saida" && r.entity === "pj")
+      .reduce((s, r) => s + r.amount, 0);
+    const outPf = of
+      .filter((r) => r.direction === "saida" && r.entity !== "pj")
+      .reduce((s, r) => s + r.amount, 0);
+    return { monthRef: m, income, outPj, outPf, left: income - outPj - outPf };
+  });
 }
 
 /** "8.500,00", "8500", "R$ 8.500" → 8500 */
