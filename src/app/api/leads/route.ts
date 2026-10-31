@@ -3,7 +3,7 @@ import { and, eq, gte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { leadNotes, leads } from "@/lib/db/schema";
-import { normalizeInterest } from "@/lib/leads";
+import { matchInterest, normalizeInterest } from "@/lib/leads";
 
 /**
  * Entrada pública de leads do site de Pedro Santos.
@@ -128,13 +128,13 @@ function normalizeKeys(raw: Record<string, unknown>) {
     company: pick("company", "empresa", "organization", "organizacao", "companyname", "nomeempresa", "instituicao"),
     role: pick("role", "cargo", "jobtitle", "position", "funcao"),
     interest: pick(
-      "interest", "interesse", "servico", "service", "tipo", "type", "assunto", "subject",
+      "interest", "interesse", "tag", "etiqueta", "assuntosite", "servico", "service", "tipo", "type", "assunto", "subject",
       "tipoevento", "eventtype", "solucao", "produto"
     ),
     message: pick("message", "mensagem", "descricao", "description", "msg", "comments", "comentarios", "detalhes", "details", "observacoes"),
     utm_source: pick("utmsource"),
     utm_campaign: pick("utmcampaign"),
-    page_url: pick("pageurl", "pagina", "url", "page", "origem", "source", "landingpage", "referrer"),
+    page_url: pick("pageurl", "pagina", "paginaorigem", "url", "page", "origem", "source", "landingpage", "referrer"),
     website: pick("website", "gotcha", "honeypot"),
   };
 }
@@ -199,7 +199,8 @@ async function handle(req: NextRequest) {
     phone: d.phone,
     organization: d.company,
     role: d.role,
-    interest: normalizeInterest(d.interest) ?? d.interest,
+    // assunto: campo explícito do formulário; sem ele, deduz pela página de origem (/palestras, /vendas...)
+    interest: matchInterest(d.interest) ?? matchInterest(d.page_url) ?? normalizeInterest(d.interest),
     message: d.message,
     source: "site",
     stage: "novo",

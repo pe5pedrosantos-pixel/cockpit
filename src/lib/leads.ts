@@ -17,11 +17,24 @@ export type LeadStage = (typeof LEAD_STAGES)[number]["key"];
 export const OPEN_STAGES: LeadStage[] = ["novo", "contato", "briefing", "proposta", "negociacao"];
 
 export const LEAD_INTERESTS: Record<string, string> = {
-  palestra: "Palestra",
+  palestra: "Palestras",
+  vendas: "Vendas",
+  livro: "Livro",
+  marketing: "Marketing",
+  youtube: "YouTube",
   consultoria: "Consultoria",
   mentoria: "Mentoria",
   treinamento: "Treinamento",
   outro: "Outro",
+};
+
+/** Cor da etiqueta de assunto no card, para o comercial bater o olho. */
+export const LEAD_INTEREST_COLORS: Record<string, string> = {
+  palestra: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200",
+  vendas: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
+  livro: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
+  marketing: "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
+  youtube: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200",
 };
 
 export const LEAD_SOURCES: Record<string, string> = {
@@ -42,18 +55,28 @@ export function isStage(key: string): key is LeadStage {
   return LEAD_STAGES.some((s) => s.key === key);
 }
 
-/** Interesse vindo do site em texto livre → uma das chaves conhecidas. */
-export function normalizeInterest(raw?: string | null): string | null {
+/** Assunto reconhecido no texto (interesse, página ou origem), ou null. */
+export function matchInterest(raw?: string | null): string | null {
   if (!raw) return null;
   const v = raw
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   if (v.includes("palestr") || v.includes("keynote") || v.includes("evento")) return "palestra";
+  if (v.includes("youtube")) return "youtube";
+  if (v.includes("livro") || v.includes("lista_espera") || v.includes("lista de espera") || v.includes("book")) return "livro";
+  if (v.includes("marketing") || v.includes("sobe")) return "marketing";
+  if (v.includes("venda") || v.includes("comercial") || v.includes("sales")) return "vendas";
   if (v.includes("consult")) return "consultoria";
   if (v.includes("mentor")) return "mentoria";
   if (v.includes("trein") || v.includes("workshop") || v.includes("curso")) return "treinamento";
-  return "outro";
+  return null;
+}
+
+/** Interesse vindo do site em texto livre → uma das chaves conhecidas. */
+export function normalizeInterest(raw?: string | null): string | null {
+  if (!raw) return null;
+  return matchInterest(raw) ?? "outro";
 }
 
 /** Telefone BR → link do WhatsApp (assume +55 quando vier sem DDI). */

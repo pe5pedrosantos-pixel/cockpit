@@ -24,6 +24,7 @@ import {
 } from "@/lib/actions/leads";
 import {
   LEAD_INTERESTS,
+  LEAD_INTEREST_COLORS,
   LEAD_SOURCES,
   LEAD_STAGES,
   OPEN_STAGES,
@@ -129,10 +130,17 @@ function LeadCard({ lead: l, onOpen }: { lead: LeadCardData; onOpen: () => void 
             <span className="truncate">{l.organization}</span>
           </span>
         )}
-        <span>
-          {[l.interest ? (LEAD_INTERESTS[l.interest] ?? l.interest) : null, LEAD_SOURCES[l.source] ?? l.source]
-            .filter(Boolean)
-            .join(", ")}
+        <span className="flex flex-wrap items-center gap-1.5">
+          {l.interest && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                LEAD_INTEREST_COLORS[l.interest] ?? "bg-cream text-ink-muted"
+              }`}
+            >
+              {LEAD_INTERESTS[l.interest] ?? l.interest}
+            </span>
+          )}
+          <span>{LEAD_SOURCES[l.source] ?? l.source}</span>
         </span>
         {l.eventDate && (
           <span className="flex items-center gap-1.5">
