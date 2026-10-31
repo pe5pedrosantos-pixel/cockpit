@@ -30,11 +30,11 @@ export const LEAD_INTERESTS: Record<string, string> = {
 
 /** Cor da etiqueta de assunto no card, para o comercial bater o olho. */
 export const LEAD_INTEREST_COLORS: Record<string, string> = {
-  palestra: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200",
-  vendas: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
-  livro: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
-  marketing: "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
-  youtube: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200",
+  palestra: "bg-violet-100 text-violet-800",
+  vendas: "bg-emerald-100 text-emerald-800",
+  livro: "bg-amber-100 text-amber-800",
+  marketing: "bg-sky-100 text-sky-800",
+  youtube: "bg-rose-100 text-rose-800",
 };
 
 export const LEAD_SOURCES: Record<string, string> = {
