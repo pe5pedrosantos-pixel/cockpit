@@ -9,6 +9,7 @@ import {
   CheckSquare,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Mic,
   Package,
@@ -84,6 +85,9 @@ export function Sidebar({ companies }: { companies: CompanyNav[] }) {
       {item("/funil", "Funil da SOBE", <TrendingUp className="h-4 w-4" />)}
       {item("/clientes", "Clientes", <Users className="h-4 w-4" />)}
       {item("/leads", "Funil Pedro Santos", <Mic className="h-4 w-4" />)}
+
+      {section("Conteúdo")}
+      {item("/social", "Social Media", <Megaphone className="h-4 w-4" />)}
 
       {section("Entregas")}
       {companies.map((c) => {
