@@ -15,7 +15,11 @@ export async function middleware(req: NextRequest) {
     // protegida pelo CRON_SECRET, não pela sessão
     pathname.startsWith("/api/cron") ||
     // formulário do site de Pedro Santos (entrada pública de leads)
-    pathname.startsWith("/api/leads")
+    pathname.startsWith("/api/leads") ||
+    // conector MCP do Claude: protegido pelo MCP_SECRET no caminho
+    pathname.startsWith("/api/mcp/") ||
+    // descoberta de OAuth do cliente MCP: responde 404 em vez de mandar ao login
+    pathname.startsWith("/.well-known/")
   ) {
     return NextResponse.next();
   }
