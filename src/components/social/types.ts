@@ -1,5 +1,16 @@
 /** Formatos que a página manda para os componentes da aba Social Media. */
 
+export interface MediaData {
+  id: number;
+  kind: string; // imagem | video | pdf | outro
+  url: string;
+  name: string | null;
+  contentType: string | null;
+  size: number | null;
+  position: number;
+  source: string;
+}
+
 export interface PostData {
   id: number;
   date: string;
@@ -30,6 +41,7 @@ export interface PostData {
   urlInstagram: string | null;
   updatedBy: string;
   updatedAt: string;
+  media: MediaData[];
 }
 
 export interface LineData {

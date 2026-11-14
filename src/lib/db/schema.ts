@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -524,6 +525,28 @@ export const smRuns = pgTable("sm_runs", {
   ranAt: timestamp("ran_at").defaultNow().notNull(),
 });
 
+/**
+ * Arquivos de um post (slides do carrossel, vídeo, PDF), guardados no
+ * Vercel Blob do cockpit. position define a ordem no carrossel.
+ * kind: imagem | video | pdf | outro · source: upload | claude | metricool
+ */
+export const smMedia = pgTable("sm_media", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id")
+    .notNull()
+    .references(() => smPosts.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull().default("imagem"),
+  url: text("url").notNull(),
+  pathname: text("pathname"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  position: integer("position").notNull().default(0),
+  name: text("name"),
+  source: text("source").notNull().default("upload"),
+  originalUrl: text("original_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [index("sm_media_post_idx").on(t.postId, t.position)]);
+
 /** Configurações (grade semanal, horários, links). */
 export const smSettings = pgTable("sm_settings", {
   key: text("key").primaryKey(),
@@ -556,3 +579,4 @@ export type SmMetric = typeof smMetrics.$inferSelect;
 export type SmAnalysis = typeof smAnalyses.$inferSelect;
 export type SmIdea = typeof smIdeas.$inferSelect;
 export type SmRun = typeof smRuns.$inferSelect;
+export type SmMedia = typeof smMedia.$inferSelect;

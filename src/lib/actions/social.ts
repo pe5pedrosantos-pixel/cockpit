@@ -10,6 +10,10 @@ import {
   addAnalysis,
   addIdeas,
   approvePost,
+  attachStoredMedia,
+  copyMediaFromUrls,
+  moveMedia,
+  removeMedia,
   createRequest,
   deletePost,
   deleteRequest,
@@ -33,6 +37,7 @@ import {
   writeCaption,
 } from "@/lib/social/ai";
 import { addDays } from "@/lib/social/constants";
+import { StorageError } from "@/lib/social/storage";
 import { todayISO } from "@/lib/format";
 
 export type Result<T = undefined> = { ok: boolean; message: string; data?: T };
@@ -59,7 +64,9 @@ async function run<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
     done();
     return r;
   } catch (e) {
-    if (e instanceof SocialError || e instanceof AiError) return { ok: false, message: e.message };
+    if (e instanceof SocialError || e instanceof AiError || e instanceof StorageError) {
+      return { ok: false, message: e.message };
+    }
     if (e instanceof z.ZodError) return { ok: false, message: firstIssue(e) };
     console.error("[social]", e);
     return { ok: false, message: "Algo deu errado. Tente de novo." };
@@ -147,6 +154,48 @@ export async function askAgentForPostAction(
       await db.update(smPosts).set({ status: "producao", updatedAt: new Date() }).where(eq(smPosts.id, postId));
     }
     return { ok: true, message: "Pedido enviado ao agente." };
+  });
+}
+
+// ─── Mídias ───────────────────────────────────────────────────────────────
+
+const uploadedFile = z.object({
+  url: z.string().url(),
+  pathname: z.string().max(500).nullable().optional(),
+  contentType: z.string().max(120).nullable().optional(),
+  size: z.number().int().min(0).nullable().optional(),
+  name: z.string().max(200).nullable().optional(),
+});
+
+/** Liga ao post um arquivo que o navegador acabou de subir para o Blob. */
+export async function attachUploadedMediaAction(postId: number, file: unknown): Promise<Result> {
+  return run(async () => {
+    await attachStoredMedia(postId, uploadedFile.parse(file), "pedro");
+    return { ok: true, message: "Arquivo anexado." };
+  });
+}
+
+/** Copia para o cockpit um arquivo de um link público (Drive, Canva...). */
+export async function attachMediaFromUrlAction(postId: number, url: string): Promise<Result> {
+  return run(async () => {
+    const link = z.string().trim().url("Cole um link completo, começando com https://").parse(url);
+    const { saved, failed } = await copyMediaFromUrls(postId, [link], { source: "upload" }, "pedro");
+    if (!saved.length) throw new SocialError(failed[0]?.erro ?? "Não consegui copiar o arquivo.");
+    return { ok: true, message: "Arquivo copiado para o cockpit." };
+  });
+}
+
+export async function removeMediaAction(id: number): Promise<Result> {
+  return run(async () => {
+    await removeMedia(id);
+    return { ok: true, message: "Arquivo removido." };
+  });
+}
+
+export async function moveMediaAction(id: number, dir: -1 | 1): Promise<Result> {
+  return run(async () => {
+    await moveMedia(id, dir === -1 ? -1 : 1);
+    return { ok: true, message: "" };
   });
 }
 

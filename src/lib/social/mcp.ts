@@ -2,20 +2,23 @@ import "server-only";
 import { desc, eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { smAnalyses, smIdeas, type SmPost, type SmRequest } from "@/lib/db/schema";
+import { smAnalyses, smIdeas, type SmMedia, type SmPost, type SmRequest } from "@/lib/db/schema";
 import {
   addAnalysis,
   addIdeas,
   addRun,
   approvePost,
+  copyMediaFromUrls,
   createRequest,
   getPost,
   getSettings,
   isSocialReady,
   listLines,
+  listMedia,
   listPosts,
   listRequests,
   overview,
+  removeMedia,
   requestAdjustment,
   savePost,
   saveLine,
@@ -35,6 +38,7 @@ import {
   runInput,
 } from "@/lib/social/schemas";
 import { POST_STATUS_KEYS, REQUEST_STATUS_KEYS, TARGET_KEYS } from "@/lib/social/constants";
+import { isStorageConfigured, StorageError } from "@/lib/social/storage";
 
 /**
  * Servidor MCP do cockpit (Streamable HTTP, sem sessão, respostas em JSON).
@@ -47,7 +51,8 @@ export const SUPPORTED_PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2
 const INSTRUCTIONS = `Cockpit do Pedro Santos, aba Social Media (marca @pe5antos, Instagram e LinkedIn).
 Comece por ver_resumo. Solicitações "para_claude" são trabalho para você: marque em_andamento ao começar e concluida ao terminar, com o resultado e o link. Para pedir algo ao Pedro (aprovação, fotos, decisão), use criar_solicitacao com destino "pedro".
 Nunca agende nem publique sem o post estar "aprovado" pelo Pedro. Depois de agendar no Metricool, salve o post com status "agendado" e os ids do Metricool: o pedido de agendamento fecha sozinho. Peça pronta para o OK do Pedro vai com status "aguardando_ok".
-Registre cada rotina com registrar_execucao e as métricas do Metricool com registrar_metricas.`;
+Registre cada rotina com registrar_execucao e as métricas do Metricool com registrar_metricas.
+Artes e vídeos ficam no próprio cockpit: depois de exportar do Canva ou do Higgsfield, chame anexar_midias com os links (na ordem dos slides). Para agendar no Metricool, use os links de "midias" do post.`;
 
 type Tool = {
   name: string;
@@ -62,7 +67,21 @@ const BY = "claude" as const;
 
 // ─── Saída em português (mesmos nomes da entrada) ─────────────────────────
 
-function postOut(p: SmPost, full = true) {
+function mediaOut(m: SmMedia) {
+  return { id: m.id, tipo: m.kind, url: m.url, nome: m.name, ordem: m.position };
+}
+
+async function mediaFor(ids: number[]) {
+  const map = new Map<number, SmMedia[]>();
+  for (const m of await listMedia(ids)) {
+    const list = map.get(m.postId) ?? [];
+    list.push(m);
+    map.set(m.postId, list);
+  }
+  return map;
+}
+
+function postOut(p: SmPost, full = true, media: SmMedia[] = []) {
   const base = {
     id: p.id,
     data: p.date,
@@ -84,10 +103,16 @@ function postOut(p: SmPost, full = true) {
     atualizadoEm: p.updatedAt.toISOString(),
   };
   if (!full) {
-    return { ...base, temLegendaLinkedin: !!p.captionLinkedin, temLegendaInstagram: !!p.captionInstagram };
+    return {
+      ...base,
+      temLegendaLinkedin: !!p.captionLinkedin,
+      temLegendaInstagram: !!p.captionInstagram,
+      qtdMidias: media.length,
+    };
   }
   return {
     ...base,
+    midias: media.map(mediaOut),
     chaveExterna: p.externalKey,
     legendaLinkedin: p.captionLinkedin,
     legendaInstagram: p.captionInstagram,
@@ -189,7 +214,8 @@ const tools: Tool[] = [
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
       const plus30 = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
       const rows = await listPosts({ from: a.de ?? today, to: a.ate ?? plus30, status: a.status });
-      return rows.map((p) => postOut(p, !!a.completo));
+      const media = await mediaFor(rows.map((p) => p.id));
+      return rows.map((p) => postOut(p, !!a.completo, media.get(p.id)));
     },
   },
   {
@@ -201,7 +227,7 @@ const tools: Tool[] = [
     run: async (a: { id: number }) => {
       const p = await getPost(a.id);
       if (!p) throw new SocialError(`Post ${a.id} não encontrado.`);
-      return postOut(p);
+      return postOut(p, true, await listMedia([p.id]));
     },
   },
   {
@@ -210,7 +236,38 @@ const tools: Tool[] = [
     description:
       "Cria (sem id; exige data e titulo) ou atualiza (com id, ou com chaveExterna já existente) um post. Só os campos enviados mudam; envie null para apagar um campo. Sem fundo informado ao criar, o cockpit escolhe um diferente dos dias vizinhos. Status 'agendado' fecha o pedido de agendamento; 'aguardando_ok' fecha o pedido de ajuste.",
     schema: postInput,
-    run: async (a: z.infer<typeof postInput>) => postOut(await savePost(a, BY)),
+    run: async (a: z.infer<typeof postInput>) => {
+      const p = await savePost(a, BY);
+      return postOut(p, true, await listMedia([p.id]));
+    },
+  },
+  {
+    name: "anexar_midias",
+    title: "Anexar artes e vídeos a um post",
+    description:
+      "Copia arquivos de links públicos (export do Canva, vídeo do Higgsfield, mídia do Metricool, Drive público) para o armazenamento do cockpit e liga ao post, na ordem enviada (ordem dos slides do carrossel). substituir=true troca as mídias atuais do post. Devolve os links permanentes, que servem para agendar no Metricool.",
+    schema: z.object({
+      postId: z.number().int().positive(),
+      urls: z.array(z.string().url()).min(1).max(20),
+      substituir: z.boolean().optional(),
+    }),
+    run: async (a: { postId: number; urls: string[]; substituir?: boolean }) => {
+      if (!isStorageConfigured()) {
+        throw new SocialError("O armazenamento do cockpit (Vercel Blob) ainda não está conectado. Peça ao Pedro para conectar em Storage → Blob na Vercel.");
+      }
+      const { saved, failed } = await copyMediaFromUrls(a.postId, a.urls, { replace: a.substituir }, BY);
+      return { anexadas: saved.map(mediaOut), falhas: failed };
+    },
+  },
+  {
+    name: "remover_midia",
+    title: "Remover arquivo de um post",
+    description: "Remove um arquivo (pelo id em midias) do post e do armazenamento.",
+    schema: z.object({ id: z.number().int().positive() }),
+    run: async (a: { id: number }) => {
+      const m = await removeMedia(a.id);
+      return { removida: m.id };
+    },
   },
   {
     name: "aprovar_post",
@@ -354,14 +411,20 @@ const tools: Tool[] = [
         .object({ linkedin: z.string().regex(/^\d{2}:\d{2}$/), instagram: z.string().regex(/^\d{2}:\d{2}$/) })
         .optional(),
       grade: z
-        .record(z.enum(["0", "1", "2", "3", "4", "5", "6"]), z.object({ linha: z.string(), peca: z.string() }))
-        .optional(),
+        .partialRecord(z.enum(["0", "1", "2", "3", "4", "5", "6"]), z.object({ linha: z.string(), peca: z.string() }))
+        .optional()
+        .describe("só os dias que mudam (0 = domingo)"),
     }),
-    run: async (a: { horarios?: { linkedin: string; instagram: string }; grade?: Record<string, { linha: string; peca: string }> }) => {
+    run: async (a: {
+      horarios?: { linkedin: string; instagram: string };
+      grade?: Partial<Record<string, { linha: string; peca: string }>>;
+    }) => {
       const current = await getSettings();
+      const grade = { ...current.grade };
+      for (const [day, value] of Object.entries(a.grade ?? {})) if (value) grade[day] = value;
       return saveSettings({
         ...(a.horarios ? { horarios: a.horarios } : {}),
-        ...(a.grade ? { grade: { ...current.grade, ...a.grade } } : {}),
+        ...(a.grade ? { grade } : {}),
       });
     },
   },
@@ -434,7 +497,7 @@ async function callTool(name: string, args: unknown) {
     const result = await tool.run(parsed.data as never);
     return textResult(result ?? { ok: true });
   } catch (e) {
-    if (e instanceof SocialError) return textResult(e.message, true);
+    if (e instanceof SocialError || e instanceof StorageError) return textResult(e.message, true);
     console.error(`[mcp] ${name} falhou:`, e);
     return textResult(`Erro ao executar ${name}. Tente de novo.`, true);
   }

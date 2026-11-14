@@ -7,11 +7,13 @@ import {
   getSettings,
   isSocialReady,
   listLines,
+  listMedia,
   listPosts,
   listRequests,
   rotationConflicts,
 } from "@/lib/social/service";
 import { aiModel, isAiConfigured } from "@/lib/social/ai";
+import { isStorageConfigured } from "@/lib/social/storage";
 import { addDays } from "@/lib/social/constants";
 import { currentMonthRef, daysInMonth, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,8 +23,8 @@ import { NewRequestDialog, RequestsBoard } from "@/components/social/requests-bo
 import { LinesPanel } from "@/components/social/lines-panel";
 import { AnalyticsPanel } from "@/components/social/analytics-panel";
 import { ConnectionsPanel, HistoryPanel, SetupCard } from "@/components/social/settings-panels";
-import type { PostData, RequestData } from "@/components/social/types";
-import type { SmPost } from "@/lib/db/schema";
+import type { MediaData, PostData, RequestData } from "@/components/social/types";
+import type { SmMedia, SmPost } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 /** as ações com o Claude (API da Anthropic) podem levar até ~50 s */
@@ -40,7 +42,20 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]["key"];
 
-function toPost(p: SmPost): PostData {
+function toMedia(m: SmMedia): MediaData {
+  return {
+    id: m.id,
+    kind: m.kind,
+    url: m.url,
+    name: m.name,
+    contentType: m.contentType,
+    size: m.size,
+    position: m.position,
+    source: m.source,
+  };
+}
+
+function toPost(p: SmPost, media: Map<number, MediaData[]>): PostData {
   return {
     id: p.id,
     date: p.date,
@@ -71,6 +86,7 @@ function toPost(p: SmPost): PostData {
     urlInstagram: p.urlInstagram,
     updatedBy: p.updatedBy,
     updatedAt: p.updatedAt.toISOString(),
+    media: media.get(p.id) ?? [],
   };
 }
 
@@ -129,7 +145,15 @@ export default async function SocialPage({
     getSettings(),
   ]);
 
-  const postData = posts.map(toPost);
+  const mediaRows = await listMedia([...new Set([...posts, ...queue].map((p) => p.id))]);
+  const mediaByPost = new Map<number, MediaData[]>();
+  for (const m of mediaRows) {
+    const list = mediaByPost.get(m.postId) ?? [];
+    list.push(toMedia(m));
+    mediaByPost.set(m.postId, list);
+  }
+  const toPostData = (p: SmPost) => toPost(p, mediaByPost);
+  const postData = posts.map(toPostData);
   const postById = new Map([...posts, ...queue].map((p) => [p.id, p]));
   const requestData: RequestData[] = requests.map((r) => ({
     id: r.id,
@@ -184,6 +208,7 @@ export default async function SocialPage({
   const secret = process.env.MCP_SECRET ?? "";
   const mcpUrl = secret.length >= 24 ? `${proto}://${host}/api/mcp/${secret}` : null;
   const aiEnabled = isAiConfigured();
+  const storageEnabled = isStorageConfigured();
 
   const lastSync = metrics.reduce<Date | null>((max, m) => (!max || m.syncedAt > max ? m.syncedAt : max), null);
 
@@ -241,15 +266,17 @@ export default async function SocialPage({
           conflicts={rotationConflicts(posts)}
           grid={settings.grade}
           aiEnabled={aiEnabled}
+          storageEnabled={storageEnabled}
         />
       )}
 
       {tab === "fila" && (
         <ApprovalQueue
-          waiting={waiting.map(toPost)}
-          adjusting={queue.filter((p) => p.status === "ajuste").map(toPost)}
+          waiting={waiting.map(toPostData)}
+          adjusting={queue.filter((p) => p.status === "ajuste").map(toPostData)}
           lines={lineData}
           aiEnabled={aiEnabled}
+          storageEnabled={storageEnabled}
         />
       )}
 
@@ -341,6 +368,7 @@ export default async function SocialPage({
           aiModel={aiModel()}
           mcpUrl={mcpUrl}
           mcpSecretWeak={secret.length > 0 && secret.length < 24}
+          storageEnabled={storageEnabled}
           times={settings.horarios}
         />
       )}

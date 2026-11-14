@@ -7,6 +7,7 @@ import { ROTATION, WEEKDAYS_SHORT, addDays, background, weekdayOf } from "@/lib/
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PostDialog } from "@/components/social/post-dialog";
+import { MediaThumb } from "@/components/social/media-gallery";
 import { BgSwatch, LineDot, PostStatusBadge, SectionTitle } from "@/components/social/bits";
 import type { LineData, PostData } from "@/components/social/types";
 import { daysInMonth, monthLabel } from "@/lib/format";
@@ -49,6 +50,7 @@ export function SocialCalendar({
   conflicts,
   grid,
   aiEnabled,
+  storageEnabled,
 }: {
   posts: PostData[];
   lines: LineData[];
@@ -57,6 +59,7 @@ export function SocialCalendar({
   conflicts: string[];
   grid: Record<string, { linha: string; peca: string }>;
   aiEnabled: boolean;
+  storageEnabled: boolean;
 }) {
   const [open, setOpen] = useState<{ id: number | null; date: string } | null>(null);
   const lineOf = (slug: string | null) => lines.find((l) => l.slug === slug);
@@ -107,6 +110,7 @@ export function SocialCalendar({
                       <BgSwatch value={p.background} />
                       {p.extra && <span className="text-[10px] text-ink-faint">extra</span>}
                     </span>
+                    {p.media.length > 0 && <MediaThumb media={p.media} className="h-20 w-full" />}
                     <span className="line-clamp-2 text-[12px] font-medium leading-snug">{p.title}</span>
                     <PostStatusBadge status={p.status} className="self-start" />
                   </button>
@@ -297,6 +301,7 @@ export function SocialCalendar({
           neighborBgs={neighborBgs(posts, current?.date ?? open.date, current?.id)}
           lines={lines}
           aiEnabled={aiEnabled}
+          storageEnabled={storageEnabled}
           onClose={() => setOpen(null)}
         />
       )}

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { BgSwatch, Feedback, PostStatusBadge, useAction } from "@/components/social/bits";
+import { MediaGallery, MediaManager } from "@/components/social/media-gallery";
 import { ACTOR_LABEL, when, type LineData, type PostData } from "@/components/social/types";
 import { dateLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,7 @@ export function PostDialog({
   suggestedBg,
   lines,
   aiEnabled,
+  storageEnabled,
   neighborBgs,
   onClose,
 }: {
@@ -87,6 +89,7 @@ export function PostDialog({
   suggestedBg: string;
   lines: LineData[];
   aiEnabled: boolean;
+  storageEnabled: boolean;
   /** fundos dos posts principais do dia anterior e do seguinte */
   neighborBgs: string[];
   onClose: () => void;
@@ -144,28 +147,38 @@ export function PostDialog({
             </p>
           )}
 
-          {/* prévia e ações de aprovação */}
-          {post && (post.previewUrl || post.artUrl) && (
-            <div className="flex flex-wrap items-start gap-4">
-              {post.previewUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={post.previewUrl}
-                  alt={`Prévia da arte: ${post.title}`}
-                  className="h-44 w-auto rounded-md border border-border object-cover"
-                />
-              )}
-              {post.artUrl && (
-                <a
-                  href={post.artUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-navy underline underline-offset-2"
-                >
-                  Abrir a arte <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-            </div>
+          {/* arte: carrossel, vídeo ou PDF */}
+          {post && (
+            <section className="grid gap-4 md:grid-cols-[minmax(0,17rem)_1fr]">
+              <div>
+                {post.media.length === 0 && post.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={post.previewUrl}
+                    alt={`Prévia da arte: ${post.title}`}
+                    className="aspect-[4/5] w-full rounded-md border border-border object-cover"
+                  />
+                ) : (
+                  <MediaGallery media={post.media} title={post.title} bg={post.background} />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-[12.5px] font-semibold text-ink">
+                  Arte {post.media.length > 0 ? `· ${post.media.length} arquivo${post.media.length > 1 ? "s" : ""}` : ""}
+                </p>
+                <MediaManager postId={post.id} media={post.media} storageEnabled={storageEnabled} />
+                {post.artUrl && (
+                  <a
+                    href={post.artUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-navy underline underline-offset-2"
+                  >
+                    Abrir no Canva <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </section>
           )}
 
           {canApprove && (
@@ -356,11 +369,11 @@ export function PostDialog({
           {/* arte, fonte e notas */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="arte">Link da arte (Canva ou vídeo)</Label>
+              <Label htmlFor="arte">Link de edição no Canva</Label>
               <Input id="arte" value={form.arteUrl} onChange={(e) => set("arteUrl", e.target.value)} placeholder="https://www.canva.com/design/..." />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="preview">Imagem de prévia</Label>
+              <Label htmlFor="preview">Imagem de prévia (opcional)</Label>
               <Input id="preview" value={form.previewUrl} onChange={(e) => set("previewUrl", e.target.value)} placeholder="https://... .png" />
             </div>
             <div className="flex flex-col gap-1.5">
