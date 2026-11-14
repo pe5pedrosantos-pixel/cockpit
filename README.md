@@ -30,6 +30,7 @@ npm run dev
 | `MCP_SECRET` | Senha do conector do Claude (aba Social Media). Mínimo 24 caracteres: `openssl rand -hex 24` |
 | `ANTHROPIC_API_KEY` | Opcional. Liga o Claude dentro da aba Social Media (ideias, legendas, análises) |
 | `ANTHROPIC_MODEL` | Opcional. Modelo da API da Anthropic (padrão: `claude-sonnet-5-5`) |
+| `BLOB_READ_WRITE_TOKEN` | Criada pela Vercel ao conectar um Blob store ao projeto (Storage → Create → Blob). Guarda artes, vídeos e PDFs dos posts |
 
 ## Deploy (Supabase + Vercel)
 
@@ -56,6 +57,7 @@ Aba `/social`: calendário, fila de aprovação, solicitações nos dois sentido
 - **Primeira vez:** abra a aba e clique em **Preparar banco** (cria as tabelas `sm_*` e as linhas padrão). O mesmo SQL está em `drizzle/0007_social_media.sql` e é idempotente, então `npm run db:migrate` também funciona, antes ou depois.
 - **Claude → Cockpit:** conector MCP em `/api/mcp/<MCP_SECRET>` (Streamable HTTP, sem sessão). O endereço completo aparece na aba **Conexões**; adicione no claude.ai em Configurações → Conectores → Adicionar conector personalizado. Quem não tem o segredo recebe 404. O segredo vai no caminho porque conectores sem OAuth não mandam cabeçalho; ele pode aparecer nos logs da Vercel, que só você acessa.
 - **Cockpit → Claude:** com `ANTHROPIC_API_KEY`, os botões "com o Claude" chamam a API da Anthropic (cobrança por uso, à parte do plano do claude.ai). Arte, vídeo, agendamento no Metricool e métricas viram solicitações para o agente, que executa com os conectores dele (o Metricool Starter não tem API).
+- **Artes e vídeos:** cada post tem uma galeria (carrossel, vídeo, PDF) guardada no Vercel Blob. O Pedro sobe arquivos direto do navegador (`/api/social/upload`, sem passar pelo limite das funções); o agente usa a ferramenta `anexar_midias` com links do Canva, Higgsfield ou Metricool e o cockpit guarda a cópia. A tabela `sm_media` (migração 0008) é criada sozinha na primeira abertura da aba depois do deploy.
 - Código: `src/lib/social/` (regras, esquemas, servidor MCP e chamadas à API), `src/lib/actions/social.ts` e `src/components/social/`.
 
 ## Scripts

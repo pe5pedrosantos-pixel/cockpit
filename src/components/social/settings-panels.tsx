@@ -114,12 +114,14 @@ export function ConnectionsPanel({
   aiModel,
   mcpUrl,
   mcpSecretWeak,
+  storageEnabled,
   times,
 }: {
   aiConfigured: boolean;
   aiModel: string;
   mcpUrl: string | null;
   mcpSecretWeak: boolean;
+  storageEnabled: boolean;
   times: { linkedin: string; instagram: string };
 }) {
   const [show, setShow] = useState(false);
@@ -209,6 +211,29 @@ export function ConnectionsPanel({
             <p>
               Crie uma chave em console.anthropic.com (API Keys), adicione como <code>ANTHROPIC_API_KEY</code> na Vercel
               e faça um novo deploy. Sem a chave, os pedidos vão todos para a fila do agente.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Armazenamento de artes e vídeos</CardTitle>
+            <p className="text-xs text-ink-muted">Slides, vídeos e PDFs dos posts, com link permanente.</p>
+          </div>
+          {status(storageEnabled, "Ativo", "Blob não conectado")}
+        </CardHeader>
+        <CardContent className="text-[13px] text-ink-muted">
+          {storageEnabled ? (
+            <p>
+              Os arquivos ficam no Vercel Blob do projeto. Os links são públicos (quem tem o link vê), para o Metricool
+              conseguir buscar a mídia ao agendar.
+            </p>
+          ) : (
+            <p>
+              Na Vercel, abra o projeto cockpit → Storage → Create → Blob, conecte ao projeto e faça um novo deploy. A
+              variável BLOB_READ_WRITE_TOKEN é criada sozinha.
             </p>
           )}
         </CardContent>

@@ -5,16 +5,19 @@ import {
   smAnalyses,
   smIdeas,
   smLines,
+  smMedia,
   smMetrics,
   smPosts,
   smRequests,
   smRuns,
   smSettings,
   type SmLogEntry,
+  type SmMedia,
   type SmPost,
   type SmRequest,
 } from "@/lib/db/schema";
-import { SOCIAL_SCHEMA_SQL } from "@/lib/social/schema-sql";
+import { SOCIAL_MIGRATIONS } from "@/lib/social/schema-sql";
+import { copyFromUrl, isOwnBlobUrl, kindOf, removeFiles } from "@/lib/social/storage";
 import {
   DEFAULT_GRID,
   DEFAULT_LINES,
@@ -53,25 +56,52 @@ const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 // ─── Banco ────────────────────────────────────────────────────────────────
 
-/** As tabelas já existem? (antes do "Preparar banco", não existem) */
+/** Roda as migrações da aba (todas idempotentes). */
+async function runMigrations() {
+  for (const migration of SOCIAL_MIGRATIONS) {
+    const statements = migration
+      .split("--> statement-breakpoint")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const statement of statements) {
+      await db.execute(sql.raw(statement));
+    }
+  }
+}
+
+let upgrade: Promise<void> | null = null;
+
+/**
+ * A aba está pronta? Antes do primeiro "Preparar banco", não. Se o banco já
+ * foi preparado numa versão anterior, aplica sozinho as tabelas novas
+ * (CREATE ... IF NOT EXISTS), uma vez por instância do servidor.
+ */
 export async function isSocialReady(): Promise<boolean> {
   try {
-    const rows = await db.select({ key: smSettings.key }).from(smSettings).where(eq(smSettings.key, "geral"));
-    return rows.length > 0;
-  } catch {
-    // tabela ainda não existe
+    const res = await db.execute(
+      sql`select to_regclass('public.sm_settings') as settings, to_regclass('public.sm_media') as media`
+    );
+    const row = (res as unknown as { rows: { settings: string | null; media: string | null }[] }).rows?.[0];
+    if (!row?.settings) return false;
+    const [geral] = await db.select({ key: smSettings.key }).from(smSettings).where(eq(smSettings.key, "geral"));
+    if (!geral) return false;
+    if (!row.media) {
+      upgrade ??= runMigrations().catch((e) => {
+        upgrade = null;
+        throw e;
+      });
+      await upgrade;
+    }
+    return true;
+  } catch (e) {
+    console.error("[social] verificação do banco", e);
     return false;
   }
 }
 
 /** Cria as tabelas (idempotente) e grava linhas e configurações padrão. */
 export async function prepareSocialDb() {
-  const statements = SOCIAL_SCHEMA_SQL.split("--> statement-breakpoint")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const statement of statements) {
-    await db.execute(sql.raw(statement));
-  }
+  await runMigrations();
   await db
     .insert(smLines)
     .values(DEFAULT_LINES.map((l) => ({ ...l })))
@@ -249,7 +279,135 @@ export async function listPosts(opts: { from?: string; to?: string; status?: str
 }
 
 export async function deletePost(id: number) {
+  const files = await db.select({ url: smMedia.url }).from(smMedia).where(eq(smMedia.postId, id));
   await db.delete(smPosts).where(eq(smPosts.id, id));
+  await removeFiles(files.map((f) => f.url));
+}
+
+// ─── Mídias (slides, vídeo, PDF) ──────────────────────────────────────────
+
+export async function listMedia(postIds: number[]): Promise<SmMedia[]> {
+  if (!postIds.length) return [];
+  return db
+    .select()
+    .from(smMedia)
+    .where(inArray(smMedia.postId, postIds))
+    .orderBy(asc(smMedia.postId), asc(smMedia.position), asc(smMedia.id));
+}
+
+async function nextPosition(postId: number) {
+  const [row] = await db
+    .select({ max: sql<number>`coalesce(max(${smMedia.position}), -1)` })
+    .from(smMedia)
+    .where(eq(smMedia.postId, postId));
+  return Number(row?.max ?? -1) + 1;
+}
+
+/** Registra um arquivo que já está no Blob deste projeto (upload do Pedro). */
+export async function attachStoredMedia(
+  postId: number,
+  file: { url: string; pathname?: string | null; contentType?: string | null; size?: number | null; name?: string | null },
+  by: Actor
+) {
+  if (!isOwnBlobUrl(file.url)) throw new SocialError("O arquivo precisa estar no armazenamento do cockpit.");
+  const post = await getPost(postId);
+  if (!post) throw new SocialError("Post não encontrado.");
+  const [row] = await db
+    .insert(smMedia)
+    .values({
+      postId,
+      url: file.url,
+      pathname: file.pathname ?? null,
+      contentType: file.contentType ?? null,
+      size: file.size ?? null,
+      name: file.name ?? null,
+      kind: kindOf(file.contentType, file.name ?? file.url),
+      position: await nextPosition(postId),
+      source: by === "pedro" ? "upload" : by,
+    })
+    .returning();
+  await db.update(smPosts).set({ updatedBy: by, updatedAt: now() }).where(eq(smPosts.id, postId));
+  return row;
+}
+
+/**
+ * Copia arquivos de links públicos para o Blob e liga ao post, na ordem
+ * recebida. Com replace, apaga as mídias anteriores do post.
+ */
+export async function copyMediaFromUrls(
+  postId: number,
+  urls: string[],
+  opts: { replace?: boolean; source?: string },
+  by: Actor
+) {
+  const post = await getPost(postId);
+  if (!post) throw new SocialError(`Post ${postId} não encontrado.`);
+  const saved: SmMedia[] = [];
+  const failed: { url: string; erro: string }[] = [];
+  const copies: { url: string; result: Awaited<ReturnType<typeof copyFromUrl>> | null }[] = [];
+  for (const url of urls) {
+    try {
+      copies.push({ url, result: isOwnBlobUrl(url) ? null : await copyFromUrl(url, `social/post-${postId}`) });
+    } catch (e) {
+      failed.push({ url, erro: e instanceof Error ? e.message : "falhou" });
+    }
+  }
+  if (opts.replace && copies.length) {
+    const old = await db.select().from(smMedia).where(eq(smMedia.postId, postId));
+    await db.delete(smMedia).where(eq(smMedia.postId, postId));
+    await removeFiles(old.map((m) => m.url));
+  }
+  let position = await nextPosition(postId);
+  for (const c of copies) {
+    const r = c.result;
+    const [row] = await db
+      .insert(smMedia)
+      .values({
+        postId,
+        url: r?.url ?? c.url,
+        pathname: r?.pathname ?? null,
+        contentType: r?.contentType ?? null,
+        size: r?.size ?? null,
+        name: r?.name ?? null,
+        kind: r?.kind ?? kindOf(null, c.url),
+        position: position++,
+        source: opts.source ?? by,
+        originalUrl: r ? c.url : null,
+      })
+      .returning();
+    saved.push(row);
+  }
+  if (saved.length) {
+    await db.update(smPosts).set({ updatedBy: by, updatedAt: now() }).where(eq(smPosts.id, postId));
+  }
+  return { saved, failed };
+}
+
+export async function removeMedia(id: number) {
+  const [row] = await db.delete(smMedia).where(eq(smMedia.id, id)).returning();
+  if (!row) throw new SocialError("Arquivo não encontrado.");
+  await removeFiles([row.url]);
+  return row;
+}
+
+/** Troca a posição com o vizinho (dir -1 = antes, 1 = depois). */
+export async function moveMedia(id: number, dir: -1 | 1) {
+  const [item] = await db.select().from(smMedia).where(eq(smMedia.id, id));
+  if (!item) throw new SocialError("Arquivo não encontrado.");
+  const list = await db
+    .select()
+    .from(smMedia)
+    .where(eq(smMedia.postId, item.postId))
+    .orderBy(asc(smMedia.position), asc(smMedia.id));
+  const idx = list.findIndex((m) => m.id === id);
+  const other = list[idx + dir];
+  if (!other) return;
+  // renumera em sequência e troca os dois
+  const order = list.map((m) => m.id);
+  [order[idx], order[idx + dir]] = [order[idx + dir], order[idx]];
+  for (let i = 0; i < order.length; i++) {
+    await db.update(smMedia).set({ position: i }).where(eq(smMedia.id, order[i]));
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ import { WEEKDAYS_SHORT, weekdayOf } from "@/lib/social/constants";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { PostDialog } from "@/components/social/post-dialog";
+import { MediaGallery } from "@/components/social/media-gallery";
 import { BgSwatch, Empty, Feedback, LineDot, PostStatusBadge, useAction } from "@/components/social/bits";
 import type { LineData, PostData } from "@/components/social/types";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,13 @@ export function ApprovalQueue({
   adjusting,
   lines,
   aiEnabled,
+  storageEnabled,
 }: {
   waiting: PostData[];
   adjusting: PostData[];
   lines: LineData[];
   aiEnabled: boolean;
+  storageEnabled: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -93,6 +96,7 @@ export function ApprovalQueue({
           neighborBgs={[]}
           lines={lines}
           aiEnabled={aiEnabled}
+          storageEnabled={storageEnabled}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -123,24 +127,21 @@ function QueueCard({
   return (
     <article
       className={cn(
-        "grid gap-4 rounded-xl border bg-paper p-4 md:grid-cols-[11rem_1fr]",
+        "grid gap-4 rounded-xl border bg-paper p-4 md:grid-cols-[15rem_1fr]",
         selected ? "border-coral" : "border-border"
       )}
     >
       <div className="flex flex-col gap-2">
-        {p.previewUrl ? (
+        {p.media.length === 0 && p.previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.previewUrl} alt={`Prévia: ${p.title}`} className="aspect-[4/5] w-full rounded-md border border-border object-cover" />
         ) : (
-          <div
-            className="flex aspect-[4/5] w-full items-end rounded-md border border-border-strong p-2 text-[11px] font-semibold"
-            style={{
-              backgroundColor: p.background === "laranja" ? "#FF5C39" : p.background === "azul-marinho" ? "#0F1E3D" : p.background === "video" ? "#2A2A2A" : "#FFFFFF",
-              color: p.background && p.background !== "branco" ? "#F4F1EA" : "#0F1E3D",
-            }}
-          >
-            <span className="line-clamp-4">{p.title}</span>
-          </div>
+          <MediaGallery media={p.media} title={p.title} bg={p.background} size="sm" />
+        )}
+        {p.media.length === 0 && (
+          <button type="button" onClick={onOpen} className="cursor-pointer text-left text-[11.5px] text-ink-muted underline underline-offset-2">
+            Sem arte ainda · anexar
+          </button>
         )}
         {p.artUrl && (
           <a href={p.artUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] font-medium text-navy underline underline-offset-2">
